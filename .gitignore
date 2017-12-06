@@ -1,0 +1,4 @@
+build-*
+projects/VideoDDS.pro.user
+*.orig
+*.lnk
