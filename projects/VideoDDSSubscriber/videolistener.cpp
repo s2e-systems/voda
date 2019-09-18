@@ -1,15 +1,15 @@
-// Copyright 2017 S2E Software, Systems and Control 
-//  
-// Licensed under the Apache License, Version 2.0 the "License"; 
-// you may not use this file except in compliance with the License. 
-// You may obtain a copy of the License at 
-//  
-//    http://www.apache.org/licenses/LICENSE-2.0 
-//  
-// Unless required by applicable law or agreed to in writing, software 
-// distributed under the License is distributed on an "AS IS" BASIS, 
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-// See the License for the specific language governing permissions and 
+// Copyright 2017 S2E Software, Systems and Control
+//
+// Licensed under the Apache License, Version 2.0 the "License";
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
 // limitations under the License.
 
 #include "videolistener.h"
@@ -94,9 +94,18 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 
 		// The following lines might be used to enable data handling without copying
 		// the arrived data.
+		// Note however that it is very difficult to prevent the samples going out of
+		// this function scope. There is no facility in the DataReader that would
+		// support such thing (e.g. ref() or retain() does not exist for the samples).
+		//
 		//gstBuffer = gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_LAST /*flags*/,
 		//			rawDataPtr /*data*/, byteCount /*maxsize*/, 0 /*offset*/, byteCount /*size*/,
 		//		(gpointer)NULL/*user_data*/, &VideoListener::gstBufferDestroyCallBack);
+		//
+		// Another way of implementing a zero copy would be a custom allocator for the
+		// gst_buffer_new_allocate function. In that custom allocator may then the allo function
+		// do not really allocate the memory but rather keep the sample alive. And in the free
+		// function release the samples.
 
 		// Copy the arrived memory from the DDS into a GStreamer buffer
 		GstMapInfo mapInfo;

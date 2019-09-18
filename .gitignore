@@ -2,3 +2,4 @@ build-*
 projects/VideoDDS.pro.user
 *.orig
 *.lnk
+projects/CMakeLists.txt.user
