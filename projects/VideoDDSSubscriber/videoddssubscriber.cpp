@@ -1,15 +1,15 @@
-// Copyright 2017 S2E Software, Systems and Control 
-//  
-// Licensed under the Apache License, Version 2.0 the "License"; 
-// you may not use this file except in compliance with the License. 
-// You may obtain a copy of the License at 
-//  
-//    http://www.apache.org/licenses/LICENSE-2.0 
-//  
-// Unless required by applicable law or agreed to in writing, software 
-// distributed under the License is distributed on an "AS IS" BASIS, 
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-// See the License for the specific language governing permissions and 
+// Copyright 2017 S2E Software, Systems and Control
+//
+// Licensed under the Apache License, Version 2.0 the "License";
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
 // limitations under the License.
 
 #include "videoddssubscriber.h"
@@ -22,14 +22,14 @@
 #include "pipeline.h"
 #include "videolistener.h"
 
-#include "videowidgetgles2.h"
+#include "videowidgetpaintergst.h"
 
 VideoDDSsubscriber::VideoDDSsubscriber(int& argc, char** argv) :
 	QApplication(argc, argv)
-  ,m_videoListener(nullptr)
-  ,m_pipeline(nullptr)
-  ,m_dr(dds::core::null)
-  ,m_useOmx(false)
+	,m_videoListener(nullptr)
+	,m_pipeline(nullptr)
+	,m_dr(dds::core::null)
+	,m_useOmx(false)
 {
 	setApplicationName("Video DDS Subscriber");
 }
@@ -38,7 +38,7 @@ void VideoDDSsubscriber::init()
 {
 	initDDS("VideoStream");
 
-	VideoWidgetGst* widget = new VideoWidgetGst();
+	auto widget = new VideoWidgetPainterGst();
 
 	// Message handler must be installed before GStreamer init()
 	QtGStreamer::instance()->installMessageHandler(3 /*log level*/);

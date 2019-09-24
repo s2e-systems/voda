@@ -6,17 +6,23 @@ The Video over DDS Application (VoDA) is a software which allows real-time video
 The project is developed using Qt Creator and this is the recommended IDE to build the software. To be able to build and run the software the following packages must be available on your system:
 
 - GStreamer development and runtime https://gstreamer.freedesktop.org (v 1.16.0)
-- ADLINK Opensplice Community edition https://github.com/ADLINK-IST/opensplice/releases (v 6.9.19) 
+- ADLINK OpenSplice Community edition https://github.com/ADLINK-IST/opensplice/releases (v 6.9.19) 
 - Qt https://www.qt.io/ (v 5.12)
 
 While other version of these components might work, these are the ones used for development.
 
 ## System configuration ##
 
-To build the software the Qt Creator pri files use the following environment variables to search for the dependent libraries:
+To build the software the CMakeLists.txt files use the following environment variables to search for the dependent libraries:
 
-1. OSPL_HOME pointing to the folder where Opensplice is installed
+1. OSPL_HOME pointing to the folder where OpenSplice is installed
 2. GSTREAMER_1_0_ROOT_X86_64 to the folder where GStreamer is installed
+
+For run the software the shared library binaries must be added to the PATH environment variable in Windows and to the ldconfig search directories in Linux. E.g.:
+
+1. %OSPL_HOME%\bin
+2. %GSTREAMER_1_0_ROOT_X86_64%\bin
+3. %QTDIR%\bin
 
 If you have problems building start by checking that these variables exist and are correctly configured.
 The software should also build on Linux and cross-compile for other platforms (e.g Linux on ARM computers), though the build steps are dependent on your own configuration.

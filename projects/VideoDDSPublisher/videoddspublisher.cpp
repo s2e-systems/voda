@@ -21,6 +21,7 @@
 #include "videowidgetgst.h"
 #include "qtgstreamer.h"
 #include "pipelinedds.h"
+#include "videowidgetpaintergst.h"
 
 VideoDDSpublisher::VideoDDSpublisher(int& argc, char* argv[]) :
 	QApplication(argc, argv)
@@ -97,23 +98,26 @@ void VideoDDSpublisher::initDDS(const QString& topicName)
 
 void VideoDDSpublisher::initGstreamer()
 {
-	VideoWidgetGst* widget = new VideoWidgetGst();
+    auto widget = new VideoWidgetPainterGst();
 
 	// The message handler must be installed before GStreamer
 	// is initialized.
 	QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
 	QtGStreamer::instance()->init();
 
+    // No auto format discovery is implemented
+    // Supported formats of the webcam may be gathered by using gst-launch, e.g. on Windows:
+    // gst-launch-1.0 --gst-debug=*videosrc:5 ksvideosrc ! autovideosink
 
 	// Resolutions:
-	//	const QSize srcResolution(1280, 720);
-		const QSize srcResolution(640, 480);
+        const QSize srcResolution(1280, 720);
+    // const QSize srcResolution(640, 480);
 	//	const QSize aspectRatio(16, 9);
 	//	const QSize srcResolution = aspectRatio * 40;
 	//	qDebug() << srcResolution;
 
 	// A framerate of 15 seems to be supported by most webcams
-	const int framerate = 15;
+    const int framerate = 10;
 
 	if (m_pipeline != nullptr)
 	{
@@ -150,13 +154,13 @@ void VideoDDSpublisher::initGstreamer()
 			m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
 		}
 
-		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
+        m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
 		m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink(true /*add converter*/));
 		m_pipeline->linkPipeline();
 
 		widget->installAppSink(m_pipeline->appSink("AppSink"));
 
-		m_pipeline->setDataWriter(m_dataWriter);
+        m_pipeline->setDataWriter(m_dataWriter);
 		m_pipeline->startPipeline();
 	}
 	widget->show();

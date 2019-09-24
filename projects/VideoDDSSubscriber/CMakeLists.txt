@@ -44,6 +44,7 @@ set(VideoDDSSubscriberSources
 	${CommonDir}/pipeline.cpp
 	${CommonDir}/qtgstreamer.cpp
 	${CommonDir}/videowidgetgles2.cpp
+	${CommonDir}/videowidgetpaintergst.cpp
 )
 
 add_executable(VideoDDSSubscriber ${VideoDDSSubscriberSources})
