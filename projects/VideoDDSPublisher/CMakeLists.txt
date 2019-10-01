@@ -4,38 +4,23 @@ project(VideoDDSPublisher)
 set(CommonDir "../Common")
 set(SourceDir ".")
 
-# TODO: The cmake module path seems not to accept relative pathes
-# hence the temporary hard coded path here
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../Common/cmakemodules")
-list(APPEND CMAKE_MODULE_PATH "/home/dev/Common/cmakemodules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-###########
-# Qt
-# Instruct CMake to run moc automatically when needed
-set(CMAKE_AUTOMOC ON)
 
-# Find the QtWidgets library
+set(CMAKE_AUTOMOC ON)
 find_package(Qt5Widgets CONFIG REQUIRED)
 
-#########
-# Gstreamer
 find_package(GStreamer REQUIRED glib gobject base app video)
 
-#########
-# OSPL DDS
-find_package(OSPL REQUIRED)
-message(STATUS "OSPL_INCLUDE_DIRS: \"${OSPL_INCLUDE_DIRS}\"")
-message(STATUS "OSPL_LIBRARIES: \"${OSPL_LIBRARIES}\"")
+find_package(OpenSplice REQUIRED)
+OpenSplice_IDLCPP_GEN(${CommonDir}/VideoDDS.idl ${CMAKE_CURRENT_BINARY_DIR})
 
-set(IDL_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR})
-OSPL_IDLCPP_GEN(${CommonDir} VideoDDS ${IDL_GENERATED_DIR})
+set_property(SOURCE ${OpenSplice_GENERATED_SOURCES} PROPERTY SKIP_AUTOMOC ON)
 
-########
-# Sources
-set(VideoDDSPublisherSources
-	${OSPL_GENERATED_SOURCES}
+add_executable(VideoDDSPublisher
+	${OpenSplice_GENERATED_SOURCES}
 	${SourceDir}/main.cpp
 	${SourceDir}/pipelinedds.cpp
 	${SourceDir}/videoddspublisher.cpp
@@ -46,18 +31,13 @@ set(VideoDDSPublisherSources
 	${CommonDir}/videowidgetpaintergst.cpp
 )
 
-add_executable(VideoDDSPublisher ${VideoDDSPublisherSources})
-
 include_directories(VideoDDSPublisher
 	${SourceDir}
 	${CommonDir}
-	${GStreamer_INCLUDE_DIRS}
-	${OSPL_INCLUDE_DIRS}
-	${IDL_GENERATED_DIR}
 )
 
 target_link_libraries(VideoDDSPublisher
-	Qt5::Widgets
-	${GStreamer_LIBRARIES}
-	${OSPL_LIBRARIES}
+	Qt5::Widgets 
+	GStreamer::gstreamer GStreamer::glib GStreamer::gobject GStreamer::base GStreamer::app GStreamer::video 
+	OpenSplice::ddskernel OpenSplice::dcpsisocpp2 OpenSplice::dcpssacpp
 )
