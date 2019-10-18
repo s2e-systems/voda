@@ -1,15 +1,15 @@
-// Copyright 2017 S2E Software, Systems and Control 
-//  
-// Licensed under the Apache License, Version 2.0 the "License"; 
-// you may not use this file except in compliance with the License. 
-// You may obtain a copy of the License at 
-//  
-//    http://www.apache.org/licenses/LICENSE-2.0 
-//  
-// Unless required by applicable law or agreed to in writing, software 
-// distributed under the License is distributed on an "AS IS" BASIS, 
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-// See the License for the specific language governing permissions and 
+// Copyright 2017 S2E Software, Systems and Control
+//
+// Licensed under the Apache License, Version 2.0 the "License";
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
 // limitations under the License.
 
 #include "videoddspublisher.h"
@@ -24,14 +24,14 @@
 #include "videowidgetpaintergst.h"
 
 VideoDDSpublisher::VideoDDSpublisher(int& argc, char* argv[]) :
-	QApplication(argc, argv)
-	,m_mainwindow(nullptr)
-	,m_pipeline(nullptr)
-	,m_dataWriter(dds::core::null)
-	,m_useTestSrc(false)
-	,m_useOmx(false)
-	,m_useV4l(false)
-	,m_strength(0)
+QApplication(argc, argv)
+,m_mainwindow(nullptr)
+,m_pipeline(nullptr)
+,m_dataWriter(dds::core::null)
+,m_useTestSrc(false)
+,m_useOmx(false)
+,m_useV4l(false)
+,m_strength(0)
 {
 	setApplicationName("Video DDS Publisher");
 }
@@ -52,13 +52,13 @@ void VideoDDSpublisher::initDDS(const QString& topicName)
 		// The liveliness topic determines how to long to wait until the source with lower strength is used
 		// when messages are not received from the source with higher ownership strength.
 		dds::topic::qos::TopicQos topicQos
-			 = dp.default_topic_qos();
-				//	The dds::core::policy::Liveliness qos setting had been previously added here and is now
-				// (probably) at the data writer QoS. This was done to prevent a crash that was caused
-				// by having the dataReader without the Liveliness setting
-				// Further option may be:
-				//	<< dds::core::policy::Durability::Volatile()
-				//	<< dds::core::policy::Reliability::BestEffort();
+		= dp.default_topic_qos();
+		//	The dds::core::policy::Liveliness qos setting had been previously added here and is now
+		// (probably) at the data writer QoS. This was done to prevent a crash that was caused
+		// by having the dataReader without the Liveliness setting
+		// Further option may be:
+		//	<< dds::core::policy::Durability::Volatile()
+		//	<< dds::core::policy::Reliability::BestEffort();
 
 		dds::topic::Topic<S2E::Video> topic(dp, topicName.toStdString(), topicQos);
 
@@ -98,26 +98,28 @@ void VideoDDSpublisher::initDDS(const QString& topicName)
 
 void VideoDDSpublisher::initGstreamer()
 {
-    auto widget = new VideoWidgetPainterGst();
+	auto widget = new VideoWidgetPainterGst();
 
 	// The message handler must be installed before GStreamer
 	// is initialized.
 	QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
 	QtGStreamer::instance()->init();
 
-    // No auto format discovery is implemented
-    // Supported formats of the webcam may be gathered by using gst-launch, e.g. on Windows:
-    // gst-launch-1.0 --gst-debug=*videosrc:5 ksvideosrc ! autovideosink
+	// No auto format discovery is implemented
+	// Supported formats of the webcam may be gathered by using gst-launch, e.g. on Windows:
+	// gst-launch-1.0 --gst-debug=*src:5 ksvideosrc num-buffers=1 ! fakesink
+	// or on Linux:
+	// gst-launch-1.0 --gst-debug=*src:5 v4l2src num-buffers=1 ! fakesink
 
 	// Resolutions:
-        const QSize srcResolution(1280, 720);
-    // const QSize srcResolution(640, 480);
+	const QSize srcResolution(1280, 720);
+	// const QSize srcResolution(640, 480);
 	//	const QSize aspectRatio(16, 9);
 	//	const QSize srcResolution = aspectRatio * 40;
 	//	qDebug() << srcResolution;
 
 	// A framerate of 15 seems to be supported by most webcams
-    const int framerate = 10;
+	const int framerate = 10;
 
 	if (m_pipeline != nullptr)
 	{
@@ -154,13 +156,13 @@ void VideoDDSpublisher::initGstreamer()
 			m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
 		}
 
-        m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
+		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
 		m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink(true /*add converter*/));
 		m_pipeline->linkPipeline();
 
 		widget->installAppSink(m_pipeline->appSink("AppSink"));
 
-        m_pipeline->setDataWriter(m_dataWriter);
+		m_pipeline->setDataWriter(m_dataWriter);
 		m_pipeline->startPipeline();
 	}
 	widget->show();

@@ -1,15 +1,15 @@
-// Copyright 2017 S2E Software, Systems and Control 
-//  
-// Licensed under the Apache License, Version 2.0 the "License"; 
-// you may not use this file except in compliance with the License. 
-// You may obtain a copy of the License at 
-//  
-//    http://www.apache.org/licenses/LICENSE-2.0 
-//  
-// Unless required by applicable law or agreed to in writing, software 
-// distributed under the License is distributed on an "AS IS" BASIS, 
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-// See the License for the specific language governing permissions and 
+// Copyright 2017 S2E Software, Systems and Control
+//
+// Licensed under the Apache License, Version 2.0 the "License";
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
 // limitations under the License.
 
 #include "pipeline.h"
@@ -17,12 +17,12 @@
 #include <QDebug>
 
 Pipeline::Pipeline() :
-	m_pipeline(nullptr),
-	m_srcBinI(nullptr),
-	m_srcBinII(nullptr),
-	m_sinkBinMainI(nullptr),
-	m_sinkBinMainII(nullptr),
-	m_sinkBinSecondary(nullptr)
+m_pipeline(nullptr),
+m_srcBinI(nullptr),
+m_srcBinII(nullptr),
+m_sinkBinMainI(nullptr),
+m_sinkBinMainII(nullptr),
+m_sinkBinSecondary(nullptr)
 {
 
 }
@@ -104,7 +104,7 @@ void Pipeline::linkPipeline()
 	}
 
 	ret = binAdd(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(m_srcBinI), GST_ELEMENT_CAST(m_srcBinII),
-				 GST_ELEMENT_CAST(m_sinkBinMainI), GST_ELEMENT_CAST(m_sinkBinMainII), GST_ELEMENT_CAST(m_sinkBinSecondary));
+	GST_ELEMENT_CAST(m_sinkBinMainI), GST_ELEMENT_CAST(m_sinkBinMainII), GST_ELEMENT_CAST(m_sinkBinSecondary));
 	if (ret == false)
 	{
 		qWarning() << "Pipeline: Failed to add the bins to the pipeline";
@@ -224,7 +224,7 @@ GstBin* Pipeline::createDisplaySink(bool addConverter)
 	GstElement* converter = NULL;
 
 	bin = binFromDescription("glimagesink name=DisplaySink sync=false",
-							 "DisplaySinkBin");
+	"DisplaySinkBin");
 
 	displaySink = gst_bin_get_by_name(bin, "DisplaySink");
 
@@ -246,7 +246,7 @@ GstBin* Pipeline::createAppSink(bool addConverter)
 	GstElement* converter = NULL;
 
 	bin = binFromDescription("appsink name=AppSink",
-							 "AppSinkBin");
+	"AppSinkBin");
 
 	appSink = gst_bin_get_by_name(bin, "AppSink");
 
@@ -258,14 +258,14 @@ GstBin* Pipeline::createAppSink(bool addConverter)
 	}
 
 	caps = gst_caps_new_simple("video/x-raw",
-							   "format", G_TYPE_STRING, "RGBA",
-							   NULL);
+	"format", G_TYPE_STRING, "RGBA",
+	NULL);
 	g_object_set(appSink,
-				 "caps", caps,
-				 "max-buffers", 1,
-				 "drop", TRUE,
-				 "sync", FALSE,
-				NULL);
+	"caps", caps,
+	"max-buffers", 1,
+	"drop", TRUE,
+	"sync", FALSE,
+	NULL);
 
 	return bin;
 }
@@ -277,7 +277,7 @@ GstBin* Pipeline::createAppSrc(PackagingMode mode)
 	GstCaps* caps;
 
 	bin = binFromDescription("appsrc name=AppSrc",
-							 "AppSrcBin");
+	"AppSrcBin");
 
 	appSrc = gst_bin_get_by_name(bin, "AppSrc");
 
@@ -285,10 +285,10 @@ GstBin* Pipeline::createAppSrc(PackagingMode mode)
 	setCapsPackagingMode(caps, mode);
 
 	g_object_set(appSrc,
-				 "is-live", TRUE,
-				 "format", GST_FORMAT_TIME,
-				 "caps", caps,
-				NULL);
+	"is-live", TRUE,
+	"format", GST_FORMAT_TIME,
+	"caps", caps,
+	NULL);
 
 	return bin;
 }
@@ -300,8 +300,8 @@ GstBin* Pipeline::createX264encoder(int bitrate, int vbvBufCapacity, int keyIntM
 
 	//Note: config-interval=-1 means: send with every IDR frame
 	bin = binFromDescription("x264enc name=Encoder ! capsfilter name=CapsFilterAfterEncoder ! "
-							 "h264parse config-interval=-1 ! capsfilter name=CapsFilterAfterParser",
-							 "EncoderBin");
+	"h264parse config-interval=-1 ! capsfilter name=CapsFilterAfterParser",
+	"EncoderBin");
 //	bin = binFromDescription("x264enc name=Encoder ! capsfilter name=CapsFilterAfterEncoder ",
 //							 "EncoderBin");
 
@@ -320,15 +320,15 @@ GstBin* Pipeline::createX264encoder(int bitrate, int vbvBufCapacity, int keyIntM
 	}
 
 	g_object_set(encoder,
-				 "bitrate", bitrate, // Bitrate in kbit/sec
-				 "intra-refresh", intraRefresh, // Use Periodic Intra Refresh instead of IDR frames
-				 "byte-stream", byteStream, //Generate byte stream format of NALU
-				 "vbv-buf-capacity", vbvBufCapacity, //Size of the VBV buffer in milliseconds
-				 "key-int-max", keyIntMax, //Maximal distance between two key-frames (0 for automatic)
-				 "threads", numThreads, //Number of threads used by the codec (0 for automatic)
-				 "sliced-threads", slicedThreads, //Low latency but lower efficiency threading
-				 "aud", FALSE,
-				 NULL);
+	"bitrate", bitrate, // Bitrate in kbit/sec
+	"intra-refresh", intraRefresh, // Use Periodic Intra Refresh instead of IDR frames
+	"byte-stream", byteStream, //Generate byte stream format of NALU
+	"vbv-buf-capacity", vbvBufCapacity, //Size of the VBV buffer in milliseconds
+	"key-int-max", keyIntMax, //Maximal distance between two key-frames (0 for automatic)
+	"threads", numThreads, //Number of threads used by the codec (0 for automatic)
+	"sliced-threads", slicedThreads, //Low latency but lower efficiency threading
+	"aud", FALSE,
+	NULL);
 	gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency");
 
 	createAndSetCapsPackagingMode(bin, "CapsFilterAfterEncoder", modeAfterEncoder);
@@ -344,19 +344,19 @@ GstBin* Pipeline::createOpenEncoder(int bitrate, int keyIntMax, Pipeline::Packag
 	GstBin* bin;
 
 	bin = binFromDescription("openh264enc name=Encoder ! "
-							 "h264parse config-interval=-1 ! capsfilter name=CapsFilterAfterParser",
-							 "EncoderBin");
+	"h264parse config-interval=-1 ! capsfilter name=CapsFilterAfterParser",
+	"EncoderBin");
 
 	encoder = gst_bin_get_by_name(bin, "Encoder");
 
 	g_object_set(encoder,
-				 "bitrate", bitrate * 1000, //Bitrate (in bits per second)
-				 "complexity", 0, //Complexity (0: low - high speed encoding, 1: medium - medium speed encoding, 2: hight - low speed encoding)
-				 "multi-thread", numThreads, //The number of threads.
-				 "gop-size", keyIntMax, //Number of frames between intra frames
-				 "rate-control", 1, //Rate control mode (0: quality, 1: bitrate, 2: buffer, -1: off)
-				 "scene-change-detection", FALSE, //Scene change detection
-				 NULL);
+	"bitrate", bitrate * 1000, //Bitrate (in bits per second)
+	"complexity", 0, //Complexity (0: low - high speed encoding, 1: medium - medium speed encoding, 2: hight - low speed encoding)
+	"multi-thread", numThreads, //The number of threads.
+	"gop-size", keyIntMax, //Number of frames between intra frames
+	"rate-control", 1, //Rate control mode (0: quality, 1: bitrate, 2: buffer, -1: off)
+	"scene-change-detection", FALSE, //Scene change detection
+	NULL);
 
 	createAndSetCapsPackagingMode(bin, "CapsFilterAfterParser", mode);
 
@@ -369,17 +369,17 @@ GstBin* Pipeline::createOmxEncoder(int bitrate, int intraInt, Pipeline::Packagin
 	GstBin* bin;
 
 	bin = binFromDescription("omxh264enc name=Encoder ! capsfilter name=CapsFilterAfterEncoder ! "
-							 "h264parse config-interval=-1 ! capsfilter name=CapsFilterAfterParser",
-							 "EncoderBin");
+	"h264parse config-interval=-1 ! capsfilter name=CapsFilterAfterParser",
+	"EncoderBin");
 
 	encoder = gst_bin_get_by_name(bin, "OmxEncoder");
 
-	// TODO: whats the diffrence of periodicty-idr and interval-intraframes ?
+	// TODO: whats the difference of periodicty-idr and interval-intraframes ?
 	g_object_set(encoder,
-				 "target-bitrate", bitrate * 1000, // Bitrate in bit/sec
-				 "periodicty-idr", intraInt, //Periodicity of IDR frames
-				 "interval-intraframes", intraInt, //Interval of coding Intra frames
-				 NULL);
+	"target-bitrate", bitrate * 1000, // Bitrate in bit/sec
+	"periodicty-idr", intraInt, //Periodicity of IDR frames
+	"interval-intraframes", intraInt, //Interval of coding Intra frames
+	NULL);
 	gst_util_set_object_arg(G_OBJECT(encoder), "control-rate", "variable");
 
 	createAndSetCapsPackagingMode(bin, "CapsFilterAfterEncoder", modeAfterEncoder);
@@ -398,14 +398,14 @@ GstBin* Pipeline::createScaleConvert(const QSize& size, const QString& format)
 	GstBin* bin;
 
 	bin = binFromDescription("videoscale ! videoconvert ! capsfilter name=CapsFilter",
-							 "ScaleConvert");
+	"ScaleConvert");
 
 	capsfilter = gst_bin_get_by_name(bin, "CapsFilter");
 	caps = gst_caps_new_simple("video/x-raw",
-							   "format", G_TYPE_STRING, qPrintable(format),
-							   "width", G_TYPE_INT, width,
-							   "height", G_TYPE_INT, height,
-							   NULL);
+	"format", G_TYPE_STRING, qPrintable(format),
+	"width", G_TYPE_INT, width,
+	"height", G_TYPE_INT, height,
+	NULL);
 
 	g_object_set(capsfilter, "caps", caps, NULL);
 
@@ -421,20 +421,20 @@ GstBin* Pipeline::createCamSrc(const QSize& size, int framerate, int deviceIndex
 	GstElement* src;
 	GstElement* capsFilter;
 	bin = binFromDescription("ksvideosrc name=Src ! capsfilter name=CapsFilter ",
-							 "CamSrc");
+	"CamSrc");
 
 	src = gst_bin_get_by_name(bin, "Src");
 	g_object_set(src,
-		"device-index", deviceIndex,
-		"do-timestamp", TRUE,
+	"device-index", deviceIndex,
+	"do-timestamp", TRUE,
 	NULL);
 
 	GstCaps* srcCaps = gst_caps_new_simple("video/x-raw",
-		"format", G_TYPE_STRING, "YUY2",
-		"width", G_TYPE_INT, width,
-		"height", G_TYPE_INT, height,
-		"framerate", GST_TYPE_FRACTION, framerate, 1,
-		NULL);
+	"format", G_TYPE_STRING, "YUY2",
+	"width", G_TYPE_INT, width,
+	"height", G_TYPE_INT, height,
+	"framerate", GST_TYPE_FRACTION, framerate, 1,
+	NULL);
 
 	capsFilter = gst_bin_get_by_name(bin, "CapsFilter");
 	g_object_set(capsFilter, "caps", srcCaps, NULL);
@@ -453,19 +453,19 @@ GstBin* Pipeline::createV4lSrc(const QSize& size, int framerate)
 	GstElement* capsFilter;
 
 	bin = binFromDescription("v4l2src name=Src ! capsfilter name=CapsFilter ! videoflip method=5 ",
-							 "V4lSrc");
+	"V4lSrc");
 
 	src = gst_bin_get_by_name(bin, "Src");
 	g_object_set(src,
-		"do-timestamp", TRUE,
+	"do-timestamp", TRUE,
 	NULL);
 
 	GstCaps* srcCaps = gst_caps_new_simple("video/x-raw",
-		"format", G_TYPE_STRING, "YUY2",
-		"width", G_TYPE_INT, width,
-		"height", G_TYPE_INT, height,
-		"framerate", GST_TYPE_FRACTION, framerate, 1,
-		NULL);
+	"format", G_TYPE_STRING, "YUY2",
+	"width", G_TYPE_INT, width,
+	"height", G_TYPE_INT, height,
+	"framerate", GST_TYPE_FRACTION, framerate, 1,
+	NULL);
 
 	// The v4l2src does directly deliver h264 video, so the following caps may be used
 	//	GstCaps* srcCaps = gst_caps_new_simple("video/x-h264",
@@ -489,21 +489,21 @@ GstBin* Pipeline::createTestSrc(const QSize& size, int framerate)
 	GstElement* capsFilter;
 
 	bin = binFromDescription("videotestsrc name=Src ! capsfilter name=CapsFilter ",
-							 "TestSrc");
+	"TestSrc");
 
 	src = gst_bin_get_by_name(bin, "Src");
 	g_object_set(src,
-		"horizontal-speed", 1,
-		"is-live", TRUE,
+	"horizontal-speed", 1,
+	"is-live", TRUE,
 	NULL);
 
 	capsFilter = gst_bin_get_by_name(bin, "CapsFilter");
 	GstCaps* caps = gst_caps_new_simple("video/x-raw",
-		"format", G_TYPE_STRING, "YUY2",
-		"width", G_TYPE_INT, width,
-		"height", G_TYPE_INT, height,
-		"framerate", GST_TYPE_FRACTION, framerate, 1,
-		NULL);
+	"format", G_TYPE_STRING, "YUY2",
+	"width", G_TYPE_INT, width,
+	"height", G_TYPE_INT, height,
+	"framerate", GST_TYPE_FRACTION, framerate, 1,
+	NULL);
 	g_object_set(capsFilter, "caps", caps, NULL);
 
 	return bin;
@@ -514,7 +514,7 @@ GstBin* Pipeline::createAvDecoder(Pipeline::PackagingMode mode)
 	GstBin* bin;
 
 	bin = binFromDescription("h264parse ! capsfilter name=CapsFilter ! avdec_h264",
-							 "DecoderBin");
+	"DecoderBin");
 
 	createAndSetCapsPackagingMode(bin, "CapsFilter", mode);
 
@@ -526,7 +526,7 @@ GstBin* Pipeline::createOpenDecoder(Pipeline::PackagingMode mode)
 	GstBin* bin;
 
 	bin = binFromDescription("h264parse ! capsfilter name=CapsFilter ! openh264dec",
-							 "DecoderBin");
+	"DecoderBin");
 
 	createAndSetCapsPackagingMode(bin, "CapsFilter", mode);
 
@@ -539,7 +539,7 @@ GstBin* Pipeline::createOmxDecoder()
 	// Note the omxh264dec does has only this cap: stream-format: byte-stream,  alignment: au
 	// Hence no capsfilter is usefull between the parser and the decoder
 	bin = binFromDescription("h264parse ! omxh264dec",
-							 "OmxDecoderBin");
+	"OmxDecoderBin");
 
 	return bin;
 }
@@ -656,21 +656,21 @@ void Pipeline::setCapsPackagingMode(GstCaps* caps, Pipeline::PackagingMode packa
 		break;
 	case PACKAGINGMODE_AVC:
 		gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "avc",
-							 NULL);
+		NULL);
 		break;
 	case PACKAGINGMODE_AVC3:
 		gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "avc3",
-							 NULL);
+		NULL);
 		break;
 	case PACKAGINGMODE_BYTESTREAM_AU:
 		gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "byte-stream",
-							"alignment", G_TYPE_STRING, "au",
-							 NULL);
+		"alignment", G_TYPE_STRING, "au",
+		NULL);
 		break;
 	case PACKAGINGMODE_BYTESTREAM_NAL:
 		gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "byte-stream",
-							"alignment", G_TYPE_STRING, "nal",
-							 NULL);
+		"alignment", G_TYPE_STRING, "nal",
+		NULL);
 		break;
 	default:
 		qWarning("PackagingMode \"%d\" does not exist", packagingMode);
@@ -784,9 +784,9 @@ GstBusSyncReply Pipeline::busCallBack(GstBus* bus, GstMessage* msg, gpointer dat
 		GstState newState;
 		gst_message_parse_state_changed(msg, &oldState, &newState, NULL);
 		qDebug().noquote() << QString("GST-STATE-CHANGED (%1) %2 -> %3")
-			.arg(srcObjName)
-			.arg(gst_element_state_get_name(oldState))
-			.arg(gst_element_state_get_name(newState));
+		.arg(srcObjName)
+		.arg(gst_element_state_get_name(oldState))
+		.arg(gst_element_state_get_name(newState));
 		break;
 	default:
 		//qDebug() << "Bus message arrived of type" << GST_MESSAGE_TYPE(msg);
