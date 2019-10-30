@@ -58,15 +58,17 @@ else()
 		pkg_check_modules(PC_${componentPrefix} QUIET ${pkgconfigName})
 		find_path(${componentPrefix}_INCLUDE_DIR
 			NAMES ${headerFileName}
-			PATHS ${PC_${componentPrefix}_INCLUDE_DIRS} ${PC_${componentPrefix}_INCLUDEDIR}
+			PATHS ${PC_${componentPrefix}_INCLUDE_DIRS}
 			PATH_SUFFIXES gstreamer-1.0 gobject
 		)
 
 		find_library(${componentPrefix}_LIBRARY
 			NAMES ${libraryFileName}
-			HINTS ${PC_${componentPrefix}_LIBRARY_DIRS} ${PC_${componentPrefix}_LIBDIR}
+			HINTS ${PC_${componentPrefix}_LIBRARY_DIRS}
 		)
-		
+		if(${componentPrefix}_INCLUDE_DIR AND ${componentPrefix}_LIBRARY)
+			set(${componentPrefix}_FOUND TRUE)
+		endif()
 	endmacro()
 
 endif()

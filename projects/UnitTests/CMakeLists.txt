@@ -19,12 +19,15 @@ find_package(Qt5Widgets REQUIRED)
 include(GoogleTest)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-include_directories(
-"../Common"
-)
+set(COMMON_DIR "../Common")
+include_directories(${COMMON_DIR})
 
 add_executable(tests_automatic automatictests.cpp)
-add_executable(tests_manual manualtests.cpp)
+add_executable(tests_manual
+    mainmanualtests.cpp
+    manualtests.h
+    ${COMMON_DIR}/videowidgetpaintergst.cpp
+)
 
 target_link_libraries(tests_automatic PRIVATE
 	gtest

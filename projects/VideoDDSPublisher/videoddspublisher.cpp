@@ -98,7 +98,7 @@ void VideoDDSpublisher::initDDS(const QString& topicName)
 
 void VideoDDSpublisher::initGstreamer()
 {
-	auto widget = new VideoWidgetPainterGst();
+    auto widget = new VideoWidgetGst();
 
 	// The message handler must be installed before GStreamer
 	// is initialized.
@@ -152,15 +152,16 @@ void VideoDDSpublisher::initGstreamer()
 		else
 		{
 			// Possible invocation for a x264enc module, would require elevated licence!
-			//m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, modeAfterEncoder, modeAfterParser, 1 /*num threads*/));
-			m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
+			m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, modeAfterEncoder, modeAfterParser, 1 /*num threads*/));
+			//m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
 		}
 
 		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
-		m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink(true /*add converter*/));
+        m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink(true /*add converter*/));
+//		m_pipeline->setSinkBinSecondary(m_pipeline->createDisplaySink(true /*add converter*/));
 		m_pipeline->linkPipeline();
 
-		widget->installAppSink(m_pipeline->appSink("AppSink"));
+        widget->installAppSink(m_pipeline->appSink("AppSink"));
 
 		m_pipeline->setDataWriter(m_dataWriter);
 		m_pipeline->startPipeline();

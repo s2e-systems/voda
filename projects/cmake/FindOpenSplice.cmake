@@ -86,7 +86,9 @@ macro(OpenSplice_IDLCPP_GEN OpenSplice_IDL_FILEPATH OpenSplice_GENERATED_DIR)
 	# Get abulute dir since the marking of the generate does not
 	# work with some IDEs
 	get_filename_component(OpenSplice_IDL_ABSOLUTE_FILEPATH ${OpenSplice_IDL_FILEPATH} REALPATH)
-	get_filename_component(OpenSplice_IDL_FILEBASENAME  ${OpenSplice_IDL_FILEPATH} NAME_WLE)
+	# Note the following should be NAME_WLE instead of NAME_WE, but NAME_WLE was introduced only in CMake version 3.14
+	# As such idl filenames including multiple dots in the filename will fail here
+	get_filename_component(OpenSplice_IDL_FILEBASENAME  ${OpenSplice_IDL_FILEPATH} NAME_WE)
 	
 	set(OpenSplice_GENERATED_SOURCES_I
 		${OpenSplice_GENERATED_DIR}/${OpenSplice_IDL_FILEBASENAME}.cpp

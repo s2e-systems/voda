@@ -18,17 +18,7 @@
 #include <gst/app/gstappsink.h>
 #include <QWidget>
 
-/**
- * Extents the VideoWidgetGLES2 by GStreamer functionallity.
- * It is done by inheritance to allow the overwriting of the
- * paintGL() function to pull a sample from an GStreamer
- * appsink element. As such the most recent produced video
- * sample by the GStreamer pipeline can be rendered every time
- * a repaint is neccesarry.
- * The appsink should be configured such that only few (or
- * even one) buffer are allowed in the queue to avoid delays.
- * Also drop buffer should be set to true in the appsink element.
- */
+
 class VideoWidgetPainterGst : public QWidget
 {
 public:
