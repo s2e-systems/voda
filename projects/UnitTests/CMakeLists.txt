@@ -23,10 +23,14 @@ set(COMMON_DIR "../Common")
 include_directories(${COMMON_DIR})
 
 add_executable(tests_automatic automatictests.cpp)
+
+#set_source_files_properties(manualtests.cpp PROPERTIES COMPILE_FLAGS -Wold-style-cast)
+
 add_executable(tests_manual
-    mainmanualtests.cpp
-    manualtests.h
-    ${COMMON_DIR}/videowidgetpaintergst.cpp
+	mainmanualtests.cpp
+	manualtests.cpp
+	${COMMON_DIR}/pipeline.cpp
+	${COMMON_DIR}/videowidgetpaintergst.cpp
 )
 
 target_link_libraries(tests_automatic PRIVATE

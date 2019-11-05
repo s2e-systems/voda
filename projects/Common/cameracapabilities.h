@@ -1,6 +1,9 @@
 #ifndef CAMERACAPABILITIES_H
 #define CAMERACAPABILITIES_H
 
+#include <vector>
+#include <algorithm>
+
 #include <gst/gst.h>
 #include <gst/gstinfo.h>
 #include <gst/gstcapsfeatures.h>
@@ -8,7 +11,7 @@
 struct CapabilitySelection
 {
 	CapabilitySelection(const GstCaps* caps) :
-		m_caps{caps}
+	m_caps{caps}
 	{
 		gst_caps_ref(const_cast<GstCaps*>(m_caps));
 	}

@@ -89,7 +89,7 @@ TEST(CapabilitySelectionTest, highestPixelRateWithMinimumFramerate)
 	gst_caps_unref(resultA);
 	gst_caps_unref(resultB);
 	gst_caps_unref(caps);
-	}
+	} // scope-end to de-init CapabilitySelection before gst_deint()
 	gst_deinit();
 }
 

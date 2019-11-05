@@ -98,7 +98,7 @@ void VideoDDSpublisher::initDDS(const QString& topicName)
 
 void VideoDDSpublisher::initGstreamer()
 {
-    auto widget = new VideoWidgetGst();
+	auto widget = new VideoWidgetPainterGst();
 
 	// The message handler must be installed before GStreamer
 	// is initialized.
@@ -157,11 +157,11 @@ void VideoDDSpublisher::initGstreamer()
 		}
 
 		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
-        m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink(true /*add converter*/));
+		m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink(true /*add converter*/));
 //		m_pipeline->setSinkBinSecondary(m_pipeline->createDisplaySink(true /*add converter*/));
 		m_pipeline->linkPipeline();
 
-        widget->installAppSink(m_pipeline->appSink("AppSink"));
+		widget->installAppSink(m_pipeline->appSink("AppSink"));
 
 		m_pipeline->setDataWriter(m_dataWriter);
 		m_pipeline->startPipeline();

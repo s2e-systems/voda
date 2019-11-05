@@ -55,12 +55,12 @@ void VideoDDSsubscriber::init()
 	}
 	else
 	{
-		m_pipeline->setSrcBinII(m_pipeline->createAvDecoder(Pipeline::PACKAGINGMODE_UNDEFINED));
+//		m_pipeline->setSrcBinII(m_pipeline->createAvDecoder(Pipeline::PACKAGINGMODE_UNDEFINED));
 		// Following line may be used to use openh264dec:
 		// Note: the createOpenDecoder does not seem to work with the omxh264enc, however
 		// with the openh264dec it sworks. Difficult to find out why the omxh264enc does not work,
 		// Stopss with GstWarn: AppSrc:error: streaming stopped, reason not-negotiated (-4)
-		//m_pipeline->setSrcBinII(m_pipeline->createOpenDecoder(Pipeline::PACKAGINGMODE_UNDEFINED));
+		m_pipeline->setSrcBinII(m_pipeline->createOpenDecoder(Pipeline::PACKAGINGMODE_UNDEFINED));
 	}
 
 	m_pipeline->setSinkBinMainI(m_pipeline->createAppSink(true /*converter*/));
