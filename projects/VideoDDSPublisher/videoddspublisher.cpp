@@ -117,6 +117,7 @@ void VideoDDSpublisher::initGstreamer()
 	//	const QSize aspectRatio(16, 9);
 	//	const QSize srcResolution = aspectRatio * 40;
 	//	qDebug() << srcResolution;
+	const QSize resolution(640, 360);
 
 	// A framerate of 15 seems to be supported by most webcams
 	const int framerate = 10;
@@ -138,12 +139,12 @@ void VideoDDSpublisher::initGstreamer()
 			{
 				m_pipeline->setSrcBinI(m_pipeline->createCamSrc(srcResolution, framerate));
 			}
-			m_pipeline->setSrcBinII(m_pipeline->createScaleConvert(srcResolution));
+			m_pipeline->setSrcBinII(m_pipeline->createScaleConvert(resolution));
 		}
 
 
 		const Pipeline::PackagingMode modeAfterEncoder = Pipeline::PACKAGINGMODE_UNDEFINED;
-		const Pipeline::PackagingMode modeAfterParser = Pipeline::PACKAGINGMODE_BYTESTREAM_AU;
+		const Pipeline::PackagingMode modeAfterParser = Pipeline::PACKAGINGMODE_BYTESTREAM_NAL;
 
 		if (m_useOmx == true)
 		{
@@ -152,8 +153,8 @@ void VideoDDSpublisher::initGstreamer()
 		else
 		{
 			// Possible invocation for a x264enc module, would require elevated licence!
-//			m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, modeAfterEncoder, modeAfterParser, 1 /*num threads*/));
-			m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
+			m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, modeAfterEncoder, modeAfterParser, 1 /*num threads*/));
+//			m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
 		}
 
 		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
