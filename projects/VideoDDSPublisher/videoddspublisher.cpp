@@ -152,8 +152,8 @@ void VideoDDSpublisher::initGstreamer()
 		else
 		{
 			// Possible invocation for a x264enc module, would require elevated licence!
-			m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, modeAfterEncoder, modeAfterParser, 1 /*num threads*/));
-			//m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
+//			m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, modeAfterEncoder, modeAfterParser, 1 /*num threads*/));
+			m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
 		}
 
 		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
