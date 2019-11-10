@@ -223,22 +223,22 @@ GstBin* Pipeline::createDisplaySink(bool addConverter)
 	GstElement* displaySink;
 	GstElement* converter = NULL;
 
-	bin = binFromDescription("glimagesink name=DisplaySink sync=false",
+	bin = binFromDescription("videoconvert ! glimagesink name=DisplaySink sync=false",
 	"DisplaySinkBin");
 
-	displaySink = gst_bin_get_by_name(bin, "DisplaySink");
+//    displaySink = gst_bin_get_by_name(bin, "DisplaySink");
 
-	if (addConverter == true)
-	{
-		converter = gst_element_factory_make("videoconvert", NULL /*name*/);
-		gst_bin_add(bin, converter);
-		gst_element_link(converter, displaySink);
-	}
+//    if (addConverter == true)
+//    {
+//        converter = gst_element_factory_make("videoconvert", NULL /*name*/);
+//        gst_bin_add(bin, converter);
+//        gst_element_link(converter, displaySink);
+//    }
 
 	return bin;
 }
 
-GstBin* Pipeline::createAppSink(bool addConverter)
+GstBin* Pipeline::createAppSink()
 {
 	GstBin* bin;
 	GstCaps* caps;
@@ -250,12 +250,9 @@ GstBin* Pipeline::createAppSink(bool addConverter)
 
 	appSink = gst_bin_get_by_name(bin, "AppSink");
 
-	if (addConverter == true)
-	{
-		converter = gst_element_factory_make("videoconvert", NULL /*name*/);
-		gst_bin_add(bin, converter);
-		gst_element_link(converter, appSink);
-	}
+	converter = gst_element_factory_make("videoconvert", NULL /*name*/);
+	gst_bin_add(bin, converter);
+	gst_element_link(converter, appSink);
 
 	caps = gst_caps_new_simple("video/x-raw",
 	"format", G_TYPE_STRING, "RGBA",
@@ -270,48 +267,34 @@ GstBin* Pipeline::createAppSink(bool addConverter)
 	return bin;
 }
 
-GstBin* Pipeline::createAppSrc(PackagingMode mode)
+GstBin* Pipeline::createAppSrc()
 {
 	GstBin* bin;
 	GstElement* appSrc;
-	GstCaps* caps;
 
-	bin = binFromDescription("appsrc name=AppSrc",
+	bin = binFromDescription("appsrc name=AppSrc caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=H264 ! rtph264depay",
 	"AppSrcBin");
 
 	appSrc = gst_bin_get_by_name(bin, "AppSrc");
 
-	caps = gst_caps_new_empty_simple("video/x-h264");
-	setCapsPackagingMode(caps, mode);
-
 	g_object_set(appSrc,
 	"is-live", TRUE,
 	"format", GST_FORMAT_TIME,
-	"caps", caps,
 	NULL);
 
 	return bin;
 }
 
-GstBin* Pipeline::createX264encoder(int bitrate, int vbvBufCapacity, int keyIntMax, bool intraRefresh, Pipeline::PackagingMode modeAfterEncoder, Pipeline::PackagingMode modeAfterParse, int numThreads)
+GstBin* Pipeline::createX264encoder(int bitrate, int vbvBufCapacity, int keyIntMax, bool intraRefresh, int numThreads)
 {
 	GstElement* encoder;
 	GstBin* bin;
 
-	//Note: config-interval=-1 means: send with every IDR frame
-	bin = binFromDescription("x264enc name=Encoder ! capsfilter name=CapsFilterAfterEncoder ! "
-	"h264parse config-interval=-1 ! capsfilter name=CapsFilterAfterParser",
-	"EncoderBin");
-//	bin = binFromDescription("x264enc name=Encoder ! capsfilter name=CapsFilterAfterEncoder ",
-//							 "EncoderBin");
+	bin = binFromDescription("x264enc name=Encoder", "EncoderBin");
 
 	encoder = gst_bin_get_by_name(bin, "Encoder");
 
-	gboolean byteStream = TRUE;
-	if (modeAfterEncoder == PackagingMode::PACKAGINGMODE_AVC)
-	{
-		byteStream = FALSE;
-	}
+	gboolean byteStream = FALSE;
 
 	bool slicedThreads = true;
 	if (numThreads <= 1)
@@ -320,19 +303,16 @@ GstBin* Pipeline::createX264encoder(int bitrate, int vbvBufCapacity, int keyIntM
 	}
 
 	g_object_set(encoder,
-	"bitrate", bitrate, // Bitrate in kbit/sec
-	"intra-refresh", intraRefresh, // Use Periodic Intra Refresh instead of IDR frames
-	"byte-stream", byteStream, //Generate byte stream format of NALU
-	"vbv-buf-capacity", vbvBufCapacity, //Size of the VBV buffer in milliseconds
-	"key-int-max", keyIntMax, //Maximal distance between two key-frames (0 for automatic)
-	"threads", numThreads, //Number of threads used by the codec (0 for automatic)
-	"sliced-threads", slicedThreads, //Low latency but lower efficiency threading
-	"aud", FALSE,
+		"bitrate", bitrate, // Bitrate in kbit/sec
+		"intra-refresh", intraRefresh, // Use Periodic Intra Refresh instead of IDR frames
+		"byte-stream", byteStream, //Generate byte stream format of NALU
+		"vbv-buf-capacity", vbvBufCapacity, //Size of the VBV buffer in milliseconds
+		"key-int-max", keyIntMax, //Maximal distance between two key-frames (0 for automatic)
+		"threads", 1, //Number of threads used by the codec (0 for automatic)
+		"sliced-threads", slicedThreads, //Low latency but lower efficiency threading
+		"aud", FALSE,
 	NULL);
 	gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency");
-
-	createAndSetCapsPackagingMode(bin, "CapsFilterAfterEncoder", modeAfterEncoder);
-//	createAndSetCapsPackagingMode(bin, "CapsFilterAfterParser", modeAfterParse);
 
 	return bin;
 }
@@ -493,13 +473,13 @@ GstBin* Pipeline::createTestSrc(const QSize& size, int framerate)
 
 	src = gst_bin_get_by_name(bin, "Src");
 	g_object_set(src,
-	"horizontal-speed", 1,
+	"horizontal-speed", 10,
 	"is-live", TRUE,
 	NULL);
 
 	capsFilter = gst_bin_get_by_name(bin, "CapsFilter");
 	GstCaps* caps = gst_caps_new_simple("video/x-raw",
-	"format", G_TYPE_STRING, "YUY2",
+	"format", G_TYPE_STRING, "I420",
 	"width", G_TYPE_INT, width,
 	"height", G_TYPE_INT, height,
 	"framerate", GST_TYPE_FRACTION, framerate, 1,
@@ -509,14 +489,12 @@ GstBin* Pipeline::createTestSrc(const QSize& size, int framerate)
 	return bin;
 }
 
-GstBin* Pipeline::createAvDecoder(Pipeline::PackagingMode mode)
+GstBin* Pipeline::createAvDecoder()
 {
 	GstBin* bin;
 
-	bin = binFromDescription("h264parse ! capsfilter name=CapsFilter ! avdec_h264",
+	bin = binFromDescription("avdec_h264",
 	"DecoderBin");
-
-	createAndSetCapsPackagingMode(bin, "CapsFilter", mode);
 
 	return bin;
 }

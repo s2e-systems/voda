@@ -153,33 +153,24 @@ public:
 	static GstBin* createDisplaySink(bool addConverter = false);
 
 	/**
-	 * Creates a appsink element and if requested prepends a videovonvert element.
+	 * Creates a appsink element and prepends a videovonvert element.
 	 * The sink is configured such that only one buffer is buffered, otherwise
 	 * new buffers are dropped.
 	 * The sink only accepts a specific raw video format.
-	 * The generated appsink can be used with e,g, the appSink() funtion.
 	 * The name of the element is fixed with "AppSink"
 	 */
-	static GstBin* createAppSink(bool addConverter = false);
+	static GstBin* createAppSink();
 
 	/**
-	 * Creates a appsrc element that accepts h264 packets.
-	 * The generated appsrc can be used with e,g, the appSrc() funtion.
-	 * The name of the element is fixed with "AppSrc".
+	 * Creates a appsrc element that accepts rtp h264 packets.
 	 */
-	static GstBin* createAppSrc(PackagingMode mode = PACKAGINGMODE_UNDEFINED);
+	static GstBin* createAppSrc();
 
 	/**
-	 * Creates an x264enc element with a h264parse element appended.
-	 * modeAfterEncoder enforces the caps just after the encoder
-	 * modeAfterParse enforces the caps just after the parser
-	 *   x264enc ! capsAfterEncoder ! h264parse ! capsAfterParser
-	 * This might be useful if the x264enc element is only able to produce
-	 * a byte stream. And the parser can transform the stream into a AVC type.
-	 * Some other options are passed directly as a paramter to the x264enc element
+	 * Creates an x264enc element
+	 * Some options are passed directly as a paramter to the x264enc element
 	 */
-	static GstBin* createX264encoder(int bitrate = 500, int vbvBufCapacity = 200, int keyIntMax = 24, bool intraRefresh = false,
-								 PackagingMode modeAfterEncoder = PACKAGINGMODE_UNDEFINED, PackagingMode modeAfterParse = PACKAGINGMODE_UNDEFINED, int numThreads = 0);
+	static GstBin* createX264encoder(int bitrate = 500, int vbvBufCapacity = 200, int keyIntMax = 24, bool intraRefresh = false, int numThreads = 0);
 
 	/**
 	 * Creates a openh264enc element and attaches and h264parse to it.
@@ -198,7 +189,7 @@ public:
 	 * Creates an avdec_h264 element with a h264parse element prepended anda videoconvert element appended.
 	 * The packaging mode is used to enforce the h264parse for specific packaging mode.
 	 */
-	static GstBin* createAvDecoder(PackagingMode mode = PACKAGINGMODE_UNDEFINED);
+	static GstBin* createAvDecoder();
 
 	/**
 	 * Creates a openh264dec element with a h264parse element prepended and videoconvert element appended.

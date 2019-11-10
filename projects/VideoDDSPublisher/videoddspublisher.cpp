@@ -144,7 +144,7 @@ void VideoDDSpublisher::initGstreamer()
 
 
 		const Pipeline::PackagingMode modeAfterEncoder = Pipeline::PACKAGINGMODE_UNDEFINED;
-		const Pipeline::PackagingMode modeAfterParser = Pipeline::PACKAGINGMODE_BYTESTREAM_NAL;
+		const Pipeline::PackagingMode modeAfterParser = Pipeline::PACKAGINGMODE_AVC;
 
 		if (m_useOmx == true)
 		{
@@ -152,14 +152,11 @@ void VideoDDSpublisher::initGstreamer()
 		}
 		else
 		{
-			// Possible invocation for a x264enc module, would require elevated licence!
-			m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, modeAfterEncoder, modeAfterParser, 1 /*num threads*/));
-//			m_pipeline->setSinkBinMainI(m_pipeline->createOpenEncoder(2000 /*bitrate*/, 12/*keyIntMax*/, modeAfterParser, 0 /*num threads*/));
+			m_pipeline->setSinkBinMainI(m_pipeline->createX264encoder(2000 /*bitrate*/, 2000 /*vbvBufCapacity*/, 10 /*keyIntMax*/, false /*intraRefresh*/, 1 /*num threads*/));
 		}
 
 		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
-		m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink(true /*add converter*/));
-//		m_pipeline->setSinkBinSecondary(m_pipeline->createDisplaySink(true /*add converter*/));
+		m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink());
 		m_pipeline->linkPipeline();
 
 		widget->installAppSink(m_pipeline->appSink("AppSink"));

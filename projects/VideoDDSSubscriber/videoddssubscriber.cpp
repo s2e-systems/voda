@@ -55,15 +55,10 @@ void VideoDDSsubscriber::init()
 	}
 	else
 	{
-		m_pipeline->setSrcBinII(m_pipeline->createAvDecoder(Pipeline::PACKAGINGMODE_AVC));
-		// Following line may be used to use openh264dec:
-		// Note: the createOpenDecoder does not seem to work with the omxh264enc, however
-		// with the openh264dec it sworks. Difficult to find out why the omxh264enc does not work,
-		// Stopss with GstWarn: AppSrc:error: streaming stopped, reason not-negotiated (-4)
-//		m_pipeline->setSrcBinII(m_pipeline->createOpenDecoder(Pipeline::PACKAGINGMODE_UNDEFINED));
+		m_pipeline->setSrcBinII(m_pipeline->createAvDecoder());
 	}
 
-	m_pipeline->setSinkBinMainI(m_pipeline->createAppSink(true /*converter*/));
+	m_pipeline->setSinkBinMainI(m_pipeline->createAppSink());
 	m_pipeline->linkPipeline();
 
 	widget->installAppSink(m_pipeline->appSink());
@@ -103,7 +98,8 @@ void VideoDDSsubscriber::initDDS(const QString& topicName)
 
 		dds::sub::qos::DataReaderQos drqos = topic.qos();
 		drqos	<< dds::core::policy::Ownership::Exclusive()
-				<< dds::core::policy::Liveliness::Automatic();
+				<< dds::core::policy::Liveliness::Automatic()
+				<< dds::core::policy::History(dds::core::policy::HistoryKind::KEEP_LAST, 20);
 
 		// Trigger the callback functions when data becomes available or when the
 		// requested deadline is missed (currently not used)
