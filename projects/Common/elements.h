@@ -48,17 +48,13 @@ namespace voda
 	}
 }
 
-struct Source
+struct ElementSelection
 {
-	// GStreamer must be initialized
-	Source() :
-		m_bin{nullptr},
-		m_candidates{"v4l2src", "ksvideosrc", "videotestsrc"}
+	ElementSelection(const std::vector<std::string>& candidates, const std::string& name)
 	{
-		m_bin = GST_BIN_CAST(gst_bin_new("sourcebin"));
 		GstElementFactory* factory = nullptr;
-		auto candidate = m_candidates.begin();
-		for (; candidate < m_candidates.end(); candidate++)
+		auto candidate = candidates.begin();
+		for (; candidate < candidates.end(); candidate++)
 		{
 			factory = gst_element_factory_find(candidate->c_str());
 			if (factory != nullptr)
@@ -68,13 +64,86 @@ struct Source
 		}
 		if (factory == nullptr)
 		{
-			throw std::runtime_error("No videosource available");
+			throw std::runtime_error("None of the candidates available.");
+		}
+		m_element = gst_element_factory_create(factory, name.c_str());
+	}
+
+	std::string selection() const
+	{
+		auto name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(gst_element_get_factory(m_element)));
+		return {name};
+	}
+
+	GstElement* element()
+	{
+		return m_element;
+	}
+
+private:
+	GstElement* m_element;
+};
+
+
+struct Bin
+{
+	Bin(const std::string& name)
+	{
+		m_bin = GST_BIN_CAST(gst_bin_new(name.c_str()));
+	}
+	void add(std::vector<GstElement*> elements)
+	{
+		for (auto element : elements)
+		{
+			const auto ret = gst_bin_add(m_bin, element);
+			if (ret == false)
+			{
+				throw std::runtime_error{"Adding element to bin failed."};
+			}
+		}
+	}
+
+	void installGhost(GstElement* element, const std::string& padName)
+	{
+		auto pad = gst_element_get_static_pad(element, padName.c_str());
+		// Create ghost pad with the same name
+		auto addPadRet = gst_element_add_pad(GST_ELEMENT_CAST(m_bin), gst_ghost_pad_new(padName.c_str(), pad));
+		gst_object_unref(GST_OBJECT(pad));
+		if (addPadRet == false)
+		{
+			throw std::runtime_error("Adding ghost pad to bin failed");
+		}
+	}
+
+	GstBin* bin() {return m_bin;}
+
+private:
+	GstBin* m_bin;
+};
+
+struct Source
+{
+	// GStreamer must be initialized
+	Source() :
+		m_bin{nullptr},
+		m_candidates{"videotestsrc", "v4l2src", "ksvideosrc"}
+	{
+		ElementSelection selection{m_candidates, "videosource"};
+		Bin bin{"sourcebin"};
+
+		std::cout << "Selected source:" << selection.selection() << std::endl;
+
+		auto source = selection.element();
+		auto converter = gst_element_factory_make("videoconvert", nullptr);
+		bin.add({source, converter});
+		bin.installGhost(converter, "src");
+		const auto ret = gst_element_link_many(source, converter, nullptr);
+		if (ret == false)
+		{
+			throw std::runtime_error("Linking elements failed");
 		}
 
-		std::cout << "Selected source:" << *candidate << std::endl;
-
-		auto source = gst_element_factory_create(factory, "videosource");
-		gst_bin_add(m_bin, source);
+		m_bin = bin.bin();
 	}
 
 	GstBin* bin() {return m_bin;}
@@ -93,28 +162,16 @@ struct Encoder
 		m_candidates{"omxh264enc", "x264enc", "openh264enc"}
 	{
 		const auto bitrate = 128;
-		m_bin = GST_BIN_CAST(gst_bin_new("encoderbin"));
-		GstElement* encoder = nullptr;
-		GstElementFactory* factory = nullptr;
-		auto candidate = m_candidates.begin();
-		for (; candidate < m_candidates.end(); candidate++)
-		{
-			factory = gst_element_factory_find(candidate->c_str());
-			if (factory != nullptr)
-			{
-				break;
-			}
-		}
-		if (factory == nullptr)
-		{
-			throw std::runtime_error("No encoder available");
-		}
-		std::cout << "Selected encoder:" << *candidate << std::endl;
 
-		if (*candidate == "x264enc")
+		ElementSelection selection{m_candidates, "encoder"};
+		std::cout << "Selected encoder:" << selection.selection() << std::endl;
+
+		Bin bin{"encoderbin"};
+		m_bin = bin.bin();
+
+		if (selection.selection() == "x264enc")
 		{
-			encoder = gst_element_factory_create(factory, "encoder");
-			g_object_set(encoder,
+			g_object_set(selection.element(),
 				"bitrate", bitrate, // Bitrate in kbit/sec
 				"intra-refresh", true, // Use Periodic Intra Refresh instead of IDR frames
 				"byte-stream", false, //Generate byte stream format of NALU
@@ -124,15 +181,23 @@ struct Encoder
 				"sliced-threads", false, //Low latency but lower efficiency threading
 				"aud", false, //Use AU (Access Unit) delimiter
 			nullptr);
-			gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency");
+			gst_util_set_object_arg(G_OBJECT(selection.element()), "tune", "zerolatency");
 
-			auto capsFilter = gst_element_factory_make("capsfilter", nullptr);
-			auto caps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "avc", nullptr);
-			g_object_set(capsFilter, "caps", caps, nullptr);
-			auto parser = gst_element_factory_make("h264parse", nullptr);
-			g_object_set(parser, "config-interval", 1, nullptr);
-			gst_bin_add_many(m_bin, encoder, capsFilter, parser, nullptr);
-			gst_element_link_many(encoder, capsFilter, parser, nullptr);
+//			auto capsFilter = gst_element_factory_make("capsfilter", nullptr);
+//			auto caps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "avc", nullptr);
+//			g_object_set(capsFilter, "caps", caps, nullptr);
+//			auto parser = gst_element_factory_make("h264parse", nullptr);
+//			g_object_set(parser, "config-interval", 1, nullptr);
+			bin.add({selection.element()/*, capsFilter, parser*/});
+
+
+//			const auto ret = gst_element_link_many(selection.element()/*, capsFilter, parser*/, nullptr);
+//			if (ret == false)
+//			{
+//				throw std::runtime_error("Linking elements failed");
+//			}
+			bin.installGhost(selection.element(), "src");
+			bin.installGhost(selection.element(), "sink");
 		}
 		else
 		{
@@ -155,33 +220,24 @@ struct Decoder
 		m_bin{nullptr},
 		m_candidates{"omxh264dec", "avdec_h264", "openh264dec"}
 	{
-		m_bin = GST_BIN_CAST(gst_bin_new("decoderbin"));
-		GstElement* decoder = nullptr;
-		GstElementFactory* factory = nullptr;
-		auto canditate = m_candidates.begin();
-		for (; canditate < m_candidates.end(); canditate++)
-		{
-			factory = gst_element_factory_find(canditate->c_str());
-			if (factory != nullptr)
-			{
-				break;
-			}
-		}
-		if (factory == nullptr)
-		{
-			throw std::runtime_error("No decoder available");
-		}
-		std::cout << "Selected encoder:" << *canditate << std::endl;
+		Bin bin{"decoderbin"};
+		m_bin = bin.bin();
+		ElementSelection selection{m_candidates, "decoder"};
 
-		if (*canditate == "avdec_h264")
+
+		std::cout << "Selected decoder:" << selection.selection() << std::endl;
+
+		if (selection.selection() == "avdec_h264")
 		{
 			auto parser = gst_element_factory_make("h264parse", nullptr);
 			auto capsFilter = gst_element_factory_make("capsfilter", nullptr);
 			auto caps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "avc", nullptr);
 			g_object_set(capsFilter, "caps", caps, nullptr);
-			decoder = gst_element_factory_create(factory, "decoder");
-			gst_bin_add_many(m_bin, parser, capsFilter, decoder, nullptr);
-			gst_element_link_many(parser, capsFilter, decoder, nullptr);
+
+			gst_bin_add_many(m_bin, parser, capsFilter, selection.element(), nullptr);
+			gst_element_link_many(parser, capsFilter, selection.element(), nullptr);
+			bin.installGhost(parser, "sink");
+			bin.installGhost(selection.element(), "src");
 		}
 		else
 		{

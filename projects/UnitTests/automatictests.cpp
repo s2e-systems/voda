@@ -1,6 +1,18 @@
 #include <gtest/gtest.h>
 
+#include "elements.h"
 #include "cameracapabilities.h"
+
+TEST(ElementSelection, Selection)
+{
+	gst_init(nullptr, nullptr);
+	ElementSelection e{{"noneexistent", "videotestsrc", "fakesink"}, "name"};
+	EXPECT_EQ(e.selection(), "videotestsrc");
+
+	EXPECT_THROW((ElementSelection{{"noneexistent"}, "name"}), std::runtime_error);
+
+	gst_deinit();
+}
 
 TEST(CapabilitySelectionTest, highestPixelRate)
 {

@@ -68,20 +68,69 @@ GstBusSyncReply quitQAppOnGstMessage(GstBus* /*bus*/, GstMessage* msg, gpointer 
 	return GST_BUS_DROP;
 }
 
+TEST(ElementsTest, DISABLED_GhostPadSink)
+{
+	gst_init(nullptr, nullptr);
+
+	auto pipeline = gst_pipeline_new(nullptr);
+	auto bus = gst_element_get_bus(pipeline);
+	auto sink = gst_element_factory_make("glimagesink", nullptr);
+	auto bin = gst_bin_new(nullptr);
+	gst_bin_add(GST_BIN(bin), sink);
+	auto pad = gst_element_get_static_pad(sink, "sink");
+	gst_element_add_pad(bin, gst_ghost_pad_new(nullptr, pad));
+	gst_object_unref(GST_OBJECT(pad));
+	auto source = gst_element_factory_make("videotestsrc", nullptr);
+	g_object_set(source, "num-buffers", 50, nullptr);
+	gst_bin_add_many(GST_BIN(pipeline), source, bin, nullptr);
+	gst_element_link(source, bin);
+	gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
+
+	gst_element_set_state(pipeline, GST_STATE_NULL);
+	gst_object_unref(pipeline);
+	gst_deinit();
+}
+
+TEST(ElementsTest, DISABLED_GhostPadSrc)
+{
+	gst_init(nullptr, nullptr);
+
+	auto pipeline = gst_pipeline_new(nullptr);
+	auto bus = gst_element_get_bus(pipeline);
+	auto sink = gst_element_factory_make("glimagesink", nullptr);
+	auto source = gst_element_factory_make("videotestsrc", nullptr);
+	auto bin = gst_bin_new(nullptr);
+	gst_bin_add(GST_BIN(bin), source);
+	auto pad = gst_element_get_static_pad(source, "src");
+	gst_element_add_pad(bin, gst_ghost_pad_new(nullptr, pad));
+	gst_object_unref(GST_OBJECT(pad));
+	g_object_set(source, "num-buffers", 50, nullptr);
+	gst_bin_add_many(GST_BIN(pipeline), bin, sink, nullptr);
+	gst_element_link(bin, sink);
+	gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
+
+	gst_element_set_state(pipeline, GST_STATE_NULL);
+	gst_object_unref(pipeline);
+	gst_deinit();
+}
+
 TEST(ElementsTest, DISABLED_Source)
 {
 	gst_init(nullptr, nullptr);
 	auto pipeline = gst_pipeline_new("pipeline");
 
+	auto bus = gst_element_get_bus(pipeline);
+	gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
+
 	Source s;
-	auto source = voda::getLastElementOfBin(s.bin());
 	auto sourceBin = s.bin();
 	auto sink = gst_element_factory_make("glimagesink", nullptr);
 	gst_bin_add_many(GST_BIN_CAST(pipeline), GST_ELEMENT_CAST(sourceBin), sink, nullptr);
-	gst_element_link_many(source, sink, nullptr);
+	gst_element_link(GST_ELEMENT_CAST(sourceBin), sink);
 	gst_element_set_state(pipeline, GST_STATE_PLAYING);
 	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-	auto bus = gst_element_get_bus(pipeline);
 	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, (GstMessageType)(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
 
 	gst_element_set_state(pipeline, GST_STATE_NULL);
@@ -90,11 +139,14 @@ TEST(ElementsTest, DISABLED_Source)
 	gst_deinit();
 }
 
-TEST(ElementsTest, SourceAndEncoder)
+TEST(ElementsTest, SourceAndEncoderAndDecoder)
 {
 	// gst-launch-1.0.exe ksvideosrc ! videoconvert ! x264enc bitrate=128 intra-refresh=true byte-stream=false vbv-buf-capacity=2000 key-int-max=10 threads=1 sliced-threads=false aud=false tune=zerolatency ! video/x-h264,stream-format=avc ! h264parse config-interval=1 ! h264parse ! video/x-h264,stream-format=avc ! avdec_h264 ! glimagesink sync=false
 	gst_init(nullptr, nullptr);
 	auto pipeline = gst_pipeline_new("pipeline");
+
+	auto bus = gst_element_get_bus(pipeline);
+	//gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
 
 	Source s;
 	Encoder e;
@@ -102,21 +154,22 @@ TEST(ElementsTest, SourceAndEncoder)
 	auto sourceBin = s.bin();
 	auto encoderBin = e.bin();
 	auto decoderBin = d.bin();
+	auto source = gst_bin_get_by_name(sourceBin, "videosource");
+	g_object_set(source, "num-buffers", 50, nullptr);
 	auto converter = gst_element_factory_make("videoconvert", nullptr);
 	auto sink = gst_element_factory_make("glimagesink", nullptr);
 	g_object_set(sink, "sync", false, nullptr);
 	gst_bin_add_many(GST_BIN_CAST(pipeline), /*testsource, */GST_ELEMENT_CAST(sourceBin), converter, GST_ELEMENT_CAST(encoderBin), GST_ELEMENT_CAST(decoderBin), sink, /*fakesink, */nullptr);
 
-	gst_element_link(voda::getLastElementOfBin(sourceBin), converter);
-	gst_element_link(converter,  voda::getFirstElementOfBin(encoderBin));
-	gst_element_link(voda::getLastElementOfBin(encoderBin), voda::getFirstElementOfBin(decoderBin));
-	gst_element_link(voda::getLastElementOfBin(decoderBin), sink);
+	gst_element_link(GST_ELEMENT_CAST(sourceBin), converter);
+	gst_element_link(converter, GST_ELEMENT_CAST(encoderBin));
+	gst_element_link(GST_ELEMENT_CAST(encoderBin), GST_ELEMENT_CAST(decoderBin));
+	gst_element_link(GST_ELEMENT_CAST(decoderBin), sink);
 
 	gst_element_set_state(pipeline, GST_STATE_PLAYING);
 	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
 
-	auto bus = gst_element_get_bus(pipeline);
-	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, (GstMessageType)(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
+	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
 
 	gst_element_set_state(pipeline, GST_STATE_NULL);
 	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
