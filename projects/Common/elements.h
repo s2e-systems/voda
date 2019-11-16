@@ -46,6 +46,51 @@ namespace voda
 
 		return binElement;
 	}
+
+	void add(GstBin* bin, std::vector<GstElement*> elements)
+	{
+		for (auto element : elements)
+		{
+			const auto ret = gst_bin_add(bin, element);
+			if (ret == false)
+			{
+				throw std::runtime_error{"Adding element to bin failed."};
+			}
+		}
+	}
+
+
+	void link(std::vector<GstElement*> elements)
+	{
+		for (auto elementItr = elements.begin(); elementItr != elements.end(); elementItr++)
+		{
+
+			if (elementItr+1 != elements.end())
+			{
+				auto element = *elementItr;
+				auto nextElement = *(elementItr+1);
+				const auto ret = gst_element_link(element, nextElement);
+				if (!ret)
+				{
+					const auto name = std::string{gst_object_get_name(GST_OBJECT(element))};
+					const auto nextName = std::string{gst_object_get_name(GST_OBJECT(nextElement))};
+					throw std::runtime_error{"Linking elements " + name + " and " + nextName + " failed."};
+				}
+			}
+		}
+	}
+
+	void installGhost(GstBin* bin, GstElement* element, const std::string& padName)
+	{
+		auto pad = gst_element_get_static_pad(element, padName.c_str());
+		// Create ghost pad with the same name
+		auto addPadRet = gst_element_add_pad(GST_ELEMENT_CAST(bin), gst_ghost_pad_new(padName.c_str(), pad));
+		gst_object_unref(GST_OBJECT(pad));
+		if (addPadRet == false)
+		{
+			throw std::runtime_error("Adding ghost pad to bin failed");
+		}
+	}
 }
 
 struct ElementSelection
@@ -87,87 +132,72 @@ private:
 
 struct Bin
 {
-	Bin(const std::string& name)
-	{
-		m_bin = GST_BIN_CAST(gst_bin_new(name.c_str()));
-	}
-	void add(std::vector<GstElement*> elements)
-	{
-		for (auto element : elements)
-		{
-			const auto ret = gst_bin_add(m_bin, element);
-			if (ret == false)
-			{
-				throw std::runtime_error{"Adding element to bin failed."};
-			}
-		}
-	}
-
-	void installGhost(GstElement* element, const std::string& padName)
-	{
-		auto pad = gst_element_get_static_pad(element, padName.c_str());
-		// Create ghost pad with the same name
-		auto addPadRet = gst_element_add_pad(GST_ELEMENT_CAST(m_bin), gst_ghost_pad_new(padName.c_str(), pad));
-		gst_object_unref(GST_OBJECT(pad));
-		if (addPadRet == false)
-		{
-			throw std::runtime_error("Adding ghost pad to bin failed");
-		}
-	}
-
-	GstBin* bin() {return m_bin;}
-
+	Bin(const std::string& name) :
+		m_bin{GST_BIN_CAST(gst_bin_new(name.c_str()))}
+	{}
+	operator GstElement*() {return GST_ELEMENT_CAST(m_bin);}
+	operator GstBin*() {return m_bin;}
 private:
 	GstBin* m_bin;
 };
 
-struct Source
+struct CapsFilter
 {
-	// GStreamer must be initialized
-	Source() :
-		m_bin{nullptr},
-		m_candidates{"videotestsrc", "v4l2src", "ksvideosrc"}
+	CapsFilter(GstCaps* caps)
 	{
-		ElementSelection selection{m_candidates, "videosource"};
-		Bin bin{"sourcebin"};
+		m_element = gst_element_factory_make("capsfilter", nullptr);
+		g_object_set(m_element, "caps", caps, nullptr);
+	}
+	operator GstElement*() {return m_element;}
+private:
+	GstElement* m_element;
+};
 
-		std::cout << "Selected source:" << selection.selection() << std::endl;
+struct TestSourceJpeg : Bin
+{
+	TestSourceJpeg(const std::string& name) :
+		Bin{name}
+	{
+		auto source = gst_element_factory_make("videotestsrc", "videosource");
+		auto encoder = gst_element_factory_make("jpegenc", "encoder");
+		voda::add(*this, {source, encoder});
+		voda::installGhost(*this, encoder, "src");
+		const auto ret = gst_element_link_many(source, encoder, nullptr);
+		if (ret == false)
+		{
+			throw std::runtime_error("Linking elements failed");
+		}
+	}
+};
 
-		auto source = selection.element();
+
+struct Source : Bin
+{
+	Source(GstElement* source, const std::string& name) :
+		Bin{name}
+	{
 		auto converter = gst_element_factory_make("videoconvert", nullptr);
-		bin.add({source, converter});
-		bin.installGhost(converter, "src");
+		voda::add(*this, {source, converter});
+		voda::installGhost(*this, converter, "src");
 		const auto ret = gst_element_link_many(source, converter, nullptr);
 		if (ret == false)
 		{
 			throw std::runtime_error("Linking elements failed");
 		}
-
-		m_bin = bin.bin();
 	}
-
-	GstBin* bin() {return m_bin;}
-
-private:
-	GstBin* m_bin;
-	const std::vector<std::string> m_candidates;
 };
 
 
-struct Encoder
+struct Encoder : Bin
 {
-	// GStreamer must be initialized
-	Encoder() :
-		m_bin{nullptr},
+	Encoder(const std::string& name) :
+		Bin{name},
 		m_candidates{"omxh264enc", "x264enc", "openh264enc"}
 	{
 		const auto bitrate = 128;
 
 		ElementSelection selection{m_candidates, "encoder"};
 		std::cout << "Selected encoder:" << selection.selection() << std::endl;
-
-		Bin bin{"encoderbin"};
-		m_bin = bin.bin();
 
 		if (selection.selection() == "x264enc")
 		{
@@ -188,7 +218,7 @@ struct Encoder
 //			g_object_set(capsFilter, "caps", caps, nullptr);
 //			auto parser = gst_element_factory_make("h264parse", nullptr);
 //			g_object_set(parser, "config-interval", 1, nullptr);
-			bin.add({selection.element()/*, capsFilter, parser*/});
+			voda::add(*this, {selection.element()/*, capsFilter, parser*/});
 
 
 //			const auto ret = gst_element_link_many(selection.element()/*, capsFilter, parser*/, nullptr);
@@ -196,8 +226,8 @@ struct Encoder
 //			{
 //				throw std::runtime_error("Linking elements failed");
 //			}
-			bin.installGhost(selection.element(), "src");
-			bin.installGhost(selection.element(), "sink");
+			voda::installGhost(*this, selection.element(), "src");
+			voda::installGhost(*this, selection.element(), "sink");
 		}
 		else
 		{
@@ -205,26 +235,18 @@ struct Encoder
 		}
 	}
 
-	GstBin* bin() {return m_bin;}
-
 private:
-	GstBin* m_bin;
 	const std::vector<std::string> m_candidates;
 };
 
 
-struct Decoder
+struct Decoder : Bin
 {
-	// GStreamer must be initialized
-	Decoder() :
-		m_bin{nullptr},
+	Decoder(const std::string& name) :
+		Bin{name},
 		m_candidates{"omxh264dec", "avdec_h264", "openh264dec"}
 	{
-		Bin bin{"decoderbin"};
-		m_bin = bin.bin();
 		ElementSelection selection{m_candidates, "decoder"};
-
-
 		std::cout << "Selected decoder:" << selection.selection() << std::endl;
 
 		if (selection.selection() == "avdec_h264")
@@ -234,21 +256,17 @@ struct Decoder
 			auto caps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "avc", nullptr);
 			g_object_set(capsFilter, "caps", caps, nullptr);
 
-			gst_bin_add_many(m_bin, parser, capsFilter, selection.element(), nullptr);
+			gst_bin_add_many(*this, parser, capsFilter, selection.element(), nullptr);
 			gst_element_link_many(parser, capsFilter, selection.element(), nullptr);
-			bin.installGhost(parser, "sink");
-			bin.installGhost(selection.element(), "src");
+			voda::installGhost(*this, parser, "sink");
+			voda::installGhost(*this, selection.element(), "src");
 		}
 		else
 		{
 			throw std::runtime_error("Selected decoder not supported yet");
 		}
 	}
-
-	GstBin* bin() {return m_bin;}
-
 private:
-	GstBin* m_bin;
 	const std::vector<std::string> m_candidates;
 };
 

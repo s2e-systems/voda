@@ -13,8 +13,10 @@ if(NOT GoogleTest_POPULATED)
 	add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
 endif()
 
-find_package(GStreamer REQUIRED glib gobject base app video)
+find_package(GStreamer REQUIRED glib gobject base app video codecparsers)
 find_package(Qt5Widgets REQUIRED)
+
+add_definitions( -DGST_USE_UNSTABLE_API)
 
 include(GoogleTest)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

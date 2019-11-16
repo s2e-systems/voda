@@ -106,6 +106,52 @@ TEST(CapabilitySelectionTest, highestPixelRateWithMinimumFramerate)
 }
 
 
+
+TEST(CapabilitySelectionTest, highestJpegPixelRate)
+{
+	gst_init(nullptr, nullptr);
+	{
+	auto expectedStruct = gst_structure_new("image/jpeg",
+		"width", G_TYPE_INT, 1920,
+		"height", G_TYPE_INT, 1080,
+		"framerate", GST_TYPE_FRACTION, 20, 1,
+	nullptr);
+
+	auto expected = gst_caps_new_full(expectedStruct, nullptr);
+	gst_caps_set_features_simple(expected, gst_caps_features_new_any());
+
+	auto caps = gst_caps_new_full(
+		gst_structure_new("video/x-raw",
+				"format", G_TYPE_STRING, "YUY2",
+				"width", G_TYPE_INT, 1920,
+				"height", G_TYPE_INT, 1080,
+				"framerate", GST_TYPE_FRACTION, 30, 1,
+				 nullptr
+		),
+		gst_structure_new("image/jpeg",
+				"width", G_TYPE_INT, 1920,
+				"height", G_TYPE_INT, 1080,
+				"framerate", GST_TYPE_FRACTION, 10, 1,
+				 nullptr
+		),
+		gst_structure_copy(expectedStruct),
+		nullptr
+	);
+	gst_caps_set_features_simple(caps, gst_caps_features_new_any());
+
+	CapabilitySelection c{caps};
+	const auto result = c.highestJpegPixelRate();
+	const std::string expectedCaps{gst_caps_to_string(expected)};
+	const std::string resultCaps{gst_caps_to_string(result)};
+	EXPECT_TRUE(gst_caps_is_equal(expected, result)) << "Expected caps are: " << expectedCaps << "\nResulting caps are: " << resultCaps;
+
+	gst_caps_unref(expected);
+	gst_caps_unref(result);
+	gst_caps_unref(caps);
+	}
+	gst_deinit();
+}
+
 int main(int argc, char **argv)
 {
 	::testing::InitGoogleTest(&argc, argv);
