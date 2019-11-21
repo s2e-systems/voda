@@ -67,15 +67,10 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 	}
 
 	// Read teh samples that came in by DDS and check its validity.
-	dds::sub::LoanedSamples<S2E::Video> samples = reader.read();
+	dds::sub::LoanedSamples<S2E::Video> samples = reader.take();
 	if (samples.length() < 1)
 	{
 		qDebug() << "Samples length";
-		return;
-	}
-	if((*samples.begin()).info().valid() == false)
-	{
-		qDebug() << "Samples not valid";
 		return;
 	}
 
@@ -88,6 +83,11 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 		 sample < samples.end();
 		 ++sample)
 	{
+		if((*sample).info().valid() == false)
+		{
+			qDebug() << "Sample is not valid";
+			continue;
+		}
 		const std::vector<uint8_t> frame = sample->data().frame();
 		auto rawDataPtr = reinterpret_cast<const void *>(frame.data());
 		auto byteCount = static_cast<const gsize>(sample->data().frame().size());

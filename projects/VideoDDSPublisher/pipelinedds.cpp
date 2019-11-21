@@ -28,11 +28,14 @@ GstBin* PipelineDDS::createAppSinkForDDS()
 	GstBin* bin;
 	GstCaps* caps;
 
-	bin = binFromDescription("rtph264pay config-interval=2 ! appsink name=AppSinkDDS",
+	bin = binFromDescription("appsink name=AppSinkDDS",
 							 "AppSinkForDdsBin");
 
 	appSink = gst_bin_get_by_name(bin, "AppSinkDDS");
-	caps = gst_caps_new_empty_simple("application/x-rtp");
+	caps = gst_caps_new_simple("video/x-h264",
+		"stream-format", G_TYPE_STRING, "byte-stream",
+		"alignment", G_TYPE_STRING, "au",
+		nullptr);
 	g_object_set(appSink,
 				 "emit-signals", TRUE,
 				 "caps", caps,

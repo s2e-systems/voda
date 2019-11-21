@@ -272,7 +272,7 @@ GstBin* Pipeline::createAppSrc()
 	GstBin* bin;
 	GstElement* appSrc;
 
-	bin = binFromDescription("appsrc name=AppSrc caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=H264 ! rtph264depay",
+	bin = binFromDescription("appsrc name=AppSrc caps=video/x-h264,stream-format=byte-stream,alignment=au",
 	"AppSrcBin");
 
 	appSrc = gst_bin_get_by_name(bin, "AppSrc");
@@ -285,8 +285,11 @@ GstBin* Pipeline::createAppSrc()
 	return bin;
 }
 
-GstBin* Pipeline::createX264encoder(int bitrate, int vbvBufCapacity, int keyIntMax, bool intraRefresh, int numThreads)
+GstBin* Pipeline::createX264encoder()
 {
+	const int bitrate = 2000;
+	const int vbvBufCapacity = 100;
+	const int keyIntMax = 10;
 	GstElement* encoder;
 	GstBin* bin;
 
@@ -294,32 +297,28 @@ GstBin* Pipeline::createX264encoder(int bitrate, int vbvBufCapacity, int keyIntM
 
 	encoder = gst_bin_get_by_name(bin, "Encoder");
 
-	gboolean byteStream = FALSE;
-
-	bool slicedThreads = true;
-	if (numThreads <= 1)
-	{
-		slicedThreads = false;
-	}
-
 	g_object_set(encoder,
 		"bitrate", bitrate, // Bitrate in kbit/sec
-		"intra-refresh", intraRefresh, // Use Periodic Intra Refresh instead of IDR frames
-		"byte-stream", byteStream, //Generate byte stream format of NALU
+		"intra-refresh", false, // Use Periodic Intra Refresh instead of IDR frames
 		"vbv-buf-capacity", vbvBufCapacity, //Size of the VBV buffer in milliseconds
 		"key-int-max", keyIntMax, //Maximal distance between two key-frames (0 for automatic)
 		"threads", 1, //Number of threads used by the codec (0 for automatic)
-		"sliced-threads", slicedThreads, //Low latency but lower efficiency threading
-		"aud", FALSE,
-	NULL);
-	gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency");
+		"speed-preset", 1,
+		"insert-vui", false,
+		"trellis", false,
+		"aud", false,
+	nullptr);
 
 	return bin;
 }
 
 
-GstBin* Pipeline::createOpenEncoder(int bitrate, int keyIntMax, Pipeline::PackagingMode mode, int numThreads)
+GstBin* Pipeline::createOpenEncoder()
 {
+	const int bitrate = 2000;
+	const int keyIntMax = 10;
+	const PackagingMode mode = PACKAGINGMODE_BYTESTREAM_AU;
+
 	GstElement* encoder;
 	GstBin* bin;
 
@@ -332,7 +331,7 @@ GstBin* Pipeline::createOpenEncoder(int bitrate, int keyIntMax, Pipeline::Packag
 	g_object_set(encoder,
 	"bitrate", bitrate * 1000, //Bitrate (in bits per second)
 	"complexity", 0, //Complexity (0: low - high speed encoding, 1: medium - medium speed encoding, 2: hight - low speed encoding)
-	"multi-thread", numThreads, //The number of threads.
+	"multi-thread", 1, //The number of threads.
 	"gop-size", keyIntMax, //Number of frames between intra frames
 	"rate-control", 1, //Rate control mode (0: quality, 1: bitrate, 2: buffer, -1: off)
 	"scene-change-detection", FALSE, //Scene change detection
@@ -343,8 +342,12 @@ GstBin* Pipeline::createOpenEncoder(int bitrate, int keyIntMax, Pipeline::Packag
 	return bin;
 }
 
-GstBin* Pipeline::createOmxEncoder(int bitrate, int intraInt, Pipeline::PackagingMode modeAfterEncoder, Pipeline::PackagingMode modeAfterParse)
+GstBin* Pipeline::createOmxEncoder()
 {
+	const int bitrate = 2000;
+	const int intraInt = 10;
+	const PackagingMode modeAfterEncoder = PACKAGINGMODE_UNDEFINED;
+	const PackagingMode modeAfterParse = PACKAGINGMODE_AVC;
 	GstElement* encoder;
 	GstBin* bin;
 
@@ -771,7 +774,7 @@ GstBusSyncReply Pipeline::busCallBack(GstBus* bus, GstMessage* msg, gpointer dat
 		break;
 	}
 
-	return GST_BUS_DROP;
+	return GST_BUS_PASS;
 }
 
 void Pipeline::flushBus()

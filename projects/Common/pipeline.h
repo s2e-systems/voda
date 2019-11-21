@@ -170,20 +170,19 @@ public:
 	 * Creates an x264enc element
 	 * Some options are passed directly as a paramter to the x264enc element
 	 */
-	static GstBin* createX264encoder(int bitrate = 500, int vbvBufCapacity = 200, int keyIntMax = 24, bool intraRefresh = false, int numThreads = 0);
+	static GstBin* createX264encoder();
 
 	/**
 	 * Creates a openh264enc element and attaches and h264parse to it.
 	 * With the modeAfterParse the output of the openh264enc can be transformed.
 	 * Note: openh264enc only has the capabilty to output bytestream-au
 	 */
-	static GstBin* createOpenEncoder(int bitrate = 500, int keyIntMax = 24,
-								 PackagingMode mode = PACKAGINGMODE_BYTESTREAM_AU, int numThreads = 0);
+	static GstBin* createOpenEncoder();
 
 	/**
 	 * Creates an omxh264enc element and attaches capsfilters and a h264parse element to it as in createEncoder()
 	 */
-	static GstBin* createOmxEncoder(int bitrate = 500, int intraInt = 24, PackagingMode modeAfterEncoder = PACKAGINGMODE_AVC, PackagingMode modeAfterParse = PACKAGINGMODE_AVC);
+	static GstBin* createOmxEncoder();
 
 	/**
 	 * Creates an avdec_h264 element with a h264parse element prepended anda videoconvert element appended.
