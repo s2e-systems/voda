@@ -98,12 +98,6 @@ public:
 	int strength() const;
 	void setStrength(int strength);
 
-	/**
-	 * These method the define the usage of Video4Linux, necessary
-	 * when sampling the camera from the Linux OS
-	 */
-	bool useV4l() const;
-	void setUseV4l(bool useV4l);
 
 protected:
 
@@ -117,7 +111,6 @@ private:
 
 	bool m_useTestSrc;
 	bool m_useOmx;
-	bool m_useV4l;
 	int m_strength;
 };
 

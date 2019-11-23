@@ -22,16 +22,17 @@
 #include "qtgstreamer.h"
 #include "pipelinedds.h"
 #include "videowidgetpaintergst.h"
+#include "elements.h"
+#include "cameracapabilities.h"
 
-VideoDDSpublisher::VideoDDSpublisher(int& argc, char* argv[]) :
-QApplication(argc, argv)
-,m_mainwindow(nullptr)
-,m_pipeline(nullptr)
-,m_dataWriter(dds::core::null)
-,m_useTestSrc(false)
-,m_useOmx(false)
-,m_useV4l(false)
-,m_strength(0)
+VideoDDSpublisher::VideoDDSpublisher(int& argc, char* argv[])
+	:QApplication(argc, argv)
+	,m_mainwindow(nullptr)
+	,m_pipeline(nullptr)
+	,m_dataWriter(dds::core::null)
+	,m_useTestSrc(false)
+	,m_useOmx(false)
+	,m_strength(0)
 {
 	setApplicationName("Video DDS Publisher");
 }
@@ -105,43 +106,56 @@ void VideoDDSpublisher::initGstreamer()
 	QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
 	QtGStreamer::instance()->init();
 
-	// No auto format discovery is implemented
 	// Supported formats of the webcam may be gathered by using gst-launch, e.g. on Windows:
 	// gst-launch-1.0 --gst-debug=*src:5 ksvideosrc num-buffers=1 ! fakesink
 	// or on Linux:
 	// gst-launch-1.0 --gst-debug=*src:5 v4l2src num-buffers=1 ! fakesink
 
-	// Resolutions:
-//	const QSize srcResolution(1280, 720);
-	const QSize srcResolution(640, 480);
-	//	const QSize aspectRatio(16, 9);
-	//	const QSize srcResolution = aspectRatio * 40;
-	//	qDebug() << srcResolution;
-	const QSize resolution(640, 480);
+	std::vector<std::string> sourceCanditates;
+	if (!m_useTestSrc)
+	{
+		sourceCanditates.push_back("ksvideosrc");
+		sourceCanditates.push_back("v4l2src");
+	}
+	sourceCanditates.push_back("videotestsrc");
 
-	// A framerate of 15 seems to be supported by most webcams
-	const int framerate = 30;
+	ElementSelection sourceSelection{sourceCanditates, "source"};
+	std::cout << "selected: " << sourceSelection.elementName() << std::endl;
+
+	ElementSelection encoderSelection{sourceCanditates, "source"};
+
+	gst_element_set_state(sourceSelection.element(), GST_STATE_READY);
+	gst_element_get_state(sourceSelection.element(), nullptr/*state*/, nullptr/*pending*/, GST_CLOCK_TIME_NONE);
+	auto pad = gst_element_get_static_pad(sourceSelection.element(), "src");
+	auto caps = gst_pad_query_caps(pad, nullptr);
+
+	GstCaps* capsFilter = nullptr;
+	if (!m_useTestSrc)
+	{
+		CapabilitySelection capsSelection{caps};
+		capsFilter = capsSelection.highestRawArea(capsSelection.highestRawFrameRate());
+	}
+	else
+	{
+		capsFilter = gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, "I420", "width", G_TYPE_INT, 640, "height", G_TYPE_INT, 480, "framerate", GST_TYPE_FRACTION, 30, 1, nullptr);
+	}
+	g_print("Caps: %s\n", gst_caps_to_string(capsFilter));
+
+	GstBin* sourceBin = GST_BIN_CAST(gst_bin_new("sourceBin"));
+	gst_bin_add(sourceBin, sourceSelection.element());
+	auto filter = gst_element_factory_make("capsfilter", nullptr);
+	g_object_set(filter, "caps", capsFilter, nullptr);
+	gst_bin_add(sourceBin, filter);
+	gst_element_link(sourceSelection.element(), filter);
+	auto converter = gst_element_factory_make("videoconvert", nullptr);
+	gst_bin_add(sourceBin, converter);
+	gst_element_link(filter, converter);
 
 	if (m_pipeline != nullptr)
 	{
 		m_pipeline->createPipeline("VideoDDSPublisher");
-		if (m_useTestSrc == true)
-		{
-			m_pipeline->setSrcBinI(m_pipeline->createTestSrc());
-		}
-		else
-		{
-			if (m_useV4l == true)
-			{
-				m_pipeline->setSrcBinI(m_pipeline->createV4lSrc(srcResolution, framerate));
-			}
-			else
-			{
-				m_pipeline->setSrcBinI(m_pipeline->createCamSrc(srcResolution, framerate));
-			}
-			m_pipeline->setSrcBinII(m_pipeline->createScaleConvert(resolution));
-		}
 
+		m_pipeline->setSrcBinI(sourceBin);
 		if (m_useOmx == true)
 		{
 			m_pipeline->setSinkBinMainI(m_pipeline->createOmxEncoder());
@@ -200,12 +214,3 @@ void VideoDDSpublisher::setStrength(int strength)
 	m_strength = strength;
 }
 
-bool VideoDDSpublisher::useV4l() const
-{
-	return m_useV4l;
-}
-
-void VideoDDSpublisher::setUseV4l(bool useV4l)
-{
-	m_useV4l = useV4l;
-}

@@ -114,7 +114,7 @@ struct ElementSelection
 		m_element = gst_element_factory_create(factory, name.c_str());
 	}
 
-	std::string selection() const
+	std::string elementName() const
 	{
 		auto name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(gst_element_get_factory(m_element)));
 		return {name};
@@ -173,13 +173,13 @@ struct TestSourceJpeg : Bin
 
 struct Source : Bin
 {
-	Source(GstElement* source, const std::string& name) :
+	Source(GstElement* source, GstCaps* filter , const std::string& name) :
 		Bin{name}
 	{
 		auto converter = gst_element_factory_make("videoconvert", nullptr);
 		voda::add(*this, {source, converter});
 		voda::installGhost(*this, converter, "src");
-		const auto ret = gst_element_link_many(source, converter, nullptr);
+		const auto ret = gst_element_link_filtered(source, converter, filter);
 		if (ret == false)
 		{
 			throw std::runtime_error("Linking elements failed");
@@ -197,9 +197,9 @@ struct Encoder : Bin
 		const auto bitrate = 128;
 
 		ElementSelection selection{m_candidates, "encoder"};
-		std::cout << "Selected encoder:" << selection.selection() << std::endl;
+		std::cout << "Selected encoder:" << selection.elementName() << std::endl;
 
-		if (selection.selection() == "x264enc")
+		if (selection.elementName() == "x264enc")
 		{
 			g_object_set(selection.element(),
 				"bitrate", bitrate, // Bitrate in kbit/sec
@@ -247,9 +247,9 @@ struct Decoder : Bin
 		m_candidates{"omxh264dec", "avdec_h264", "openh264dec"}
 	{
 		ElementSelection selection{m_candidates, "decoder"};
-		std::cout << "Selected decoder:" << selection.selection() << std::endl;
+		std::cout << "Selected decoder:" << selection.elementName() << std::endl;
 
-		if (selection.selection() == "avdec_h264")
+		if (selection.elementName() == "avdec_h264")
 		{
 			auto parser = gst_element_factory_make("h264parse", nullptr);
 			auto capsFilter = gst_element_factory_make("capsfilter", nullptr);
