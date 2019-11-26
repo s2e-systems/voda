@@ -4,3 +4,5 @@ projects/VideoDDS.pro.user
 *.lnk
 projects/CMakeLists.txt.user
 *.autosave
+projects/build/
+projects/.vscode/
