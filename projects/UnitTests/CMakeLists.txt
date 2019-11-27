@@ -35,6 +35,14 @@ add_executable(tests_manual
 	${COMMON_DIR}/videowidgetpaintergst.cpp
 )
 
+add_executable(tests_recorder
+	mainrecorder.cpp
+)
+
+target_link_libraries(tests_recorder PRIVATE
+	GStreamer::gstreamer GStreamer::glib GStreamer::gobject GStreamer::base GStreamer::app GStreamer::video
+)
+
 target_link_libraries(tests_automatic PRIVATE
 	gtest
 	GStreamer::gstreamer GStreamer::glib GStreamer::gobject GStreamer::base GStreamer::app GStreamer::video

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <bitset>
 
 #include <gtest/gtest.h>
 
@@ -29,7 +30,7 @@
 #include "pipeline.h"
 #include "cameracapabilities.h"
 
-#include <bitset>
+static const auto dataDirectory = "./data";
 
 /**
  * @brief The ManualTestFeedback struct
@@ -124,25 +125,6 @@ TEST(ElementsTest, DISABLED_GhostPadSrc)
 	gst_object_unref(pipeline);
 }
 
-TEST(ElementsTest, DISABLED_Source)
-{
-	auto pipeline = gst_pipeline_new("pipeline");
-
-	auto bus = gst_element_get_bus(pipeline);
-	gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
-	ElementSelection selection{{"videotestsrc", "v4l2src", "ksvideosrc"}, "videosource"};
-	Source source{selection.element(), "sourcebin"};
-	auto sink = gst_element_factory_make("glimagesink", nullptr);
-	voda::add(GST_BIN_CAST(pipeline), {source, sink});
-	voda::link({source, sink});
-	gst_element_set_state(pipeline, GST_STATE_PLAYING);
-	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, (GstMessageType)(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
-
-	gst_element_set_state(pipeline, GST_STATE_NULL);
-	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-	gst_object_unref(pipeline);
-}
 
 TEST(EncoderTest, DISABLED_Performance)
 {
@@ -165,7 +147,7 @@ TEST(EncoderTest, DISABLED_Performance)
 		"aud", false, //Use AU (Access Unit) delimiter
 		"speed-preset", 1,
 	nullptr);
-	gst_util_set_object_arg(G_OBJECT(source), "tune", "zerolatency");
+	gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency");
 
 //	auto encoder = gst_element_factory_make("openh264enc", nullptr);
 //	g_object_set(encoder,
@@ -188,7 +170,7 @@ TEST(EncoderTest, DISABLED_Performance)
 }
 
 
-TEST(EncoderTest, ByteStream)
+TEST(EncoderTest, DISABLED_ByteStream)
 {
 	constexpr std::size_t numBuffers = 10;
 	constexpr int maxDisplaySize = 128;
@@ -208,16 +190,16 @@ TEST(EncoderTest, ByteStream)
 		g_object_set(sink, "sync", false, "caps", caps, "wait-on-eos", false, nullptr);
 		auto encoder = gst_element_factory_make("x264enc", nullptr);
 		gst_bin_add_many(GST_BIN(pipeline), source, encoder, sink, nullptr);
-		 gst_element_link_many(source, encoder, sink, nullptr);
+		gst_element_link_many(source, encoder, sink, nullptr);
 
 		const gboolean bytestream = setting;
 		g_object_set(encoder,
-			"bitrate", 30, // Bitrate in kbit/sec
+			"bitrate", 3000, // Bitrate in kbit/sec
 			"intra-refresh", false, // Use Periodic Intra Refresh instead of IDR frames
 			"byte-stream", bytestream, //Generate byte stream format of NALU
-			"key-int-max", 20, //Maximal distance between two key-frames (0 for automatic)
-			"threads", 1, //Number of threads used by the codec (0 for automatic)
-			"sliced-threads", false, //Low latency but lower efficiency threading
+			"key-int-max", 200, //Maximal distance between two key-frames (0 for automatic)
+			"threads", 10, //Number of threads used by the codec (0 for automatic)
+			"sliced-threads", true, //Low latency but lower efficiency threading
 			"aud", false, //Use AU (Access Unit) delimiter
 			"vbv-buf-capacity", 10, //Size of the VBV buffer in milliseconds
 			"speed-preset", 9,
@@ -262,14 +244,14 @@ TEST(EncoderTest, ByteStream)
 	for (const auto& v : output)
 	{
 		EXPECT_EQ(v.at(true), v.at(false)) << "NALUS must be equal till the very last bit.";
-		n++;
-		for (const auto setting : settings)
-		{
-			const auto vi = v.at(setting);
-			const auto displaySize = std::min(int(vi.size()), maxDisplaySize);
-			const std::vector<int> vs(vi.cbegin(), vi.cbegin() + displaySize);
-			std::cout << std::setw(5) << std::boolalpha << setting << ":" << std::dec << std::setw(2) << n << " " << std::setw(4) << vi.size() << "B: " << std::hex << vs << std::endl;
-		}
+//		n++;
+//		for (const auto setting : settings)
+//		{
+//			const auto vi = v.at(setting);
+//			const auto displaySize = std::min(int(vi.size()), maxDisplaySize);
+//			const std::vector<int> vs(vi.cbegin(), vi.cbegin() + displaySize);
+//			std::cout << std::setw(5) << std::boolalpha << setting << ":" << std::dec << std::setw(2) << n << " " << std::setw(4) << vi.size() << "B: " << std::hex << vs << std::endl;
+//		}
 
 	}
 }
@@ -285,16 +267,16 @@ TEST(ElementsTest, DISABLED_TestSourceJpeg)
 	auto pad = gst_element_get_static_pad(source, "src");
 	auto caps = gst_pad_query_caps(pad, nullptr);
 	CapabilitySelection s{caps};
-	auto jpegCaps = s.highestJpegPixelRate();
-	CapsFilter f{jpegCaps};
+//	auto jpegCaps = s.highestJpegPixelRate();
+//	CapsFilter f{jpegCaps};
 
 	auto sourceElement = gst_bin_get_by_name(source, "videosource");
 	g_object_set(sourceElement, "num-buffers", 50, nullptr);
 	auto decoder = gst_element_factory_make("jpegdec", nullptr);
 	auto sink = gst_element_factory_make("glimagesink", nullptr);
 
-	voda::add(GST_BIN_CAST(pipeline), {source, f, decoder, sink});
-	voda::link({source, f, decoder, sink});
+	voda::add(GST_BIN_CAST(pipeline), {source, decoder, sink});
+	voda::link({source, decoder, sink});
 
 	gst_element_set_state(pipeline, GST_STATE_PLAYING);
 	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
@@ -313,23 +295,23 @@ TEST(ElementsTest, DISABLED_Encoder)
 //	gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
 
 	ElementSelection selection{{"videotestsrc", "v4l2src", "ksvideosrc"}, "videosource"};
-	Source source{selection.element(), "sourcebin"};
-	Encoder element{"encoderbin"};
-	Decoder decoder{"decoderbin"};
-	auto sourceElement = gst_bin_get_by_name(source, "videosource");
-	g_object_set(sourceElement, "num-buffers", 50, nullptr);
-	auto converter = gst_element_factory_make("videoconvert", nullptr);
-	auto sink = gst_element_factory_make("glimagesink", nullptr);
-	g_object_set(sink, "sync", false, nullptr);
+//	Source source{selection.element(), "sourcebin"};
+//	Encoder encoder{"encoderbin"};
+//	Decoder decoder{"decoderbin"};
+//	auto sourceElement = gst_bin_get_by_name(source, "videosource");
+//	g_object_set(sourceElement, "num-buffers", 50, nullptr);
+//	auto converter = gst_element_factory_make("videoconvert", nullptr);
+//	auto sink = gst_element_factory_make("glimagesink", nullptr);
+//	g_object_set(sink, "sync", false, nullptr);
 
-	voda::add(GST_BIN_CAST(pipeline), {source, converter, element,  decoder, sink});
-	voda::link({source, converter, element,  decoder, sink});
+//	voda::add(GST_BIN_CAST(pipeline), {source, converter, encoder,  decoder, sink});
+//	voda::link({source, converter, encoder,  decoder, sink});
 
-	gst_element_set_state(pipeline, GST_STATE_PLAYING);
-	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
-	gst_element_set_state(pipeline, GST_STATE_NULL);
-	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-	gst_object_unref(pipeline);
+//	gst_element_set_state(pipeline, GST_STATE_PLAYING);
+//	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
+//	gst_element_set_state(pipeline, GST_STATE_NULL);
+//	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
+//	gst_object_unref(pipeline);
 }
 
 TEST(ElementsTest, DISABLED_SourceAndEncoderAndDecoder)
@@ -342,27 +324,27 @@ TEST(ElementsTest, DISABLED_SourceAndEncoderAndDecoder)
 	//gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
 
 	ElementSelection selection{{"videotestsrc", "v4l2src", "ksvideosrc"}, "videosource"};
-	Source source{selection.element(), "sourcebin"};
-	Encoder encoder{"encoderbin"};
-	Decoder decoder{"decoderbin"};
-	auto sourceElement = gst_bin_get_by_name(source, "videosource");
-	g_object_set(sourceElement, "num-buffers", 50, nullptr);
-	auto converter = gst_element_factory_make("videoconvert", nullptr);
-	auto sink = gst_element_factory_make("glimagesink", nullptr);
-	g_object_set(sink, "sync", false, nullptr);
+//	Source source{selection.element(), "sourcebin"};
+//	Encoder encoder{"encoderbin"};
+//	Decoder decoder{"decoderbin"};
+//	auto sourceElement = gst_bin_get_by_name(source, "videosource");
+//	g_object_set(sourceElement, "num-buffers", 50, nullptr);
+//	auto converter = gst_element_factory_make("videoconvert", nullptr);
+//	auto sink = gst_element_factory_make("glimagesink", nullptr);
+//	g_object_set(sink, "sync", false, nullptr);
 
-	voda::add(GST_BIN_CAST(pipeline), {source, converter, encoder,  decoder, sink});
-	voda::link({source, converter, encoder,  decoder, sink});
+//	voda::add(GST_BIN_CAST(pipeline), {source, converter, encoder,  decoder, sink});
+//	voda::link({source, converter, encoder,  decoder, sink});
 
-	gst_element_set_state(pipeline, GST_STATE_PLAYING);
-	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
+//	gst_element_set_state(pipeline, GST_STATE_PLAYING);
+//	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
 
-	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
+//	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
 
-	gst_element_set_state(pipeline, GST_STATE_NULL);
-	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-	gst_object_unref(pipeline);
-	gst_deinit();
+//	gst_element_set_state(pipeline, GST_STATE_NULL);
+//	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
+//	gst_object_unref(pipeline);
+//	gst_deinit();
 }
 
 
@@ -429,6 +411,118 @@ TEST(PainterWidgetTest, DISABLED_TestSourceAppsink)
 }
 
 
+
+TEST(EncoderRecorder, DISABLED_ReplayData)
+{
+	//gst-launch-1.0.exe --verbose videotestsrc num-buffers=100 horizontal-speed=2 ! video/x-raw,format=I420,width=48,height=32,framerate=10/1 !
+	// x264enc aud=false bitrate=50 speed-preset=1 ! video/x-h264,stream-format=byte-stream ! multifilesink location=buffers/test%05d.264
+	const int startIndex = 1;
+
+	const std::vector<std::string> platforms{"raspbian_gst1_14_2", "ubuntu_gst1_15_9", "windows_gst1_16_0"};
+
+	std::vector<std::string> baseNames{"openh264enc", "x264enc"};
+
+	const std::string baseName = "parsed";//baseNames.at(1);
+
+	const std::vector<std::string> encoderNames{"avdec_h264", "omxh264dec", "openh264dec"};
+	const std::string encoderName = encoderNames.at(0);
+
+	const std::string baseDirectory = "C:/Users/StefanKimmer/buffers2";
+//	const std::string baseDirectory = "./buffersWindows";
+	const std::string filenamePattern = "%05d.264";
+
+
+	const std::string location = baseDirectory + '/' + baseName + filenamePattern;
+
+	GstElementFactory* factory = nullptr;
+
+	factory = gst_element_factory_find(encoderName.c_str());
+	if (factory == nullptr)
+	{
+		FAIL() << "Encoder" << encoderName << "not available";
+	}
+
+	auto pipeline = gst_pipeline_new("pipeline");
+	auto bus = gst_element_get_bus(pipeline);
+	gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
+
+	auto source = gst_element_factory_make("multifilesrc", nullptr);
+
+	auto sourceCaps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream", "alignment", G_TYPE_STRING, "au", nullptr);
+	auto parserCaps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "avc", "alignment", G_TYPE_STRING, "au", nullptr);
+	g_object_set(source, "location", location.c_str(), "start-index", startIndex, "caps", sourceCaps, nullptr);
+
+	auto decoder = gst_element_factory_create(factory, nullptr);
+	auto parser = gst_element_factory_make("h264parse", nullptr);
+//	g_object_set(parser, "config-interval", -1, "disable-passthrough", true, nullptr);
+
+	auto sink = gst_element_factory_make("autovideosink", nullptr);
+	g_object_set(sink, "sync", true, nullptr);
+	//sink = gst_element_factory_make("appsink", nullptr);
+	//auto caps = gst_caps_new_simple("video/x-raw", nullptr);
+	//g_object_set(sink, "sync", false, "caps", caps, "wait-on-eos", false, nullptr);
+
+	gst_bin_add_many(GST_BIN(pipeline), source, parser, decoder, sink, nullptr);
+//	gst_element_link(source, parser);
+//	gst_element_link_filtered(parser, decoder, parserCaps);
+	gst_element_link(source, decoder);
+	gst_element_link(decoder, sink);
+
+	gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
+//		for(;;)
+//		{
+//			auto sample = gst_app_sink_pull_sample(GST_APP_SINK_CAST(sink));
+//			if(sample == nullptr)
+//			{
+//				break;
+//			}
+//			auto sampleBuffer = gst_sample_get_buffer(sample);
+//			if(sampleBuffer != nullptr)
+//			{
+//				GstMapInfo mapInfo;
+//				gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
+//				const auto size = static_cast<int>(mapInfo.size);
+
+//				const std::vector<unsigned char> b{mapInfo.data, mapInfo.data+size};
+//				std::cout << b << std::endl;
+//				gst_buffer_unmap(sampleBuffer, &mapInfo);
+//			}
+//			gst_sample_unref(sample);
+//		}
+	gst_element_set_state(pipeline, GST_STATE_NULL);
+	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
+	gst_object_unref(pipeline);
+
+}
+
+
+TEST(ElementSelection, DISABLED_HighestFramerate)
+{
+	// Tests if a camera source can be capsfiltered
+	auto pipeline = gst_pipeline_new("pipeline");
+	auto bus = gst_element_get_bus(pipeline);
+	ElementSelection selection{{"ksvideosrc", "v4l2src"}, "source"};
+	auto pad = gst_element_get_static_pad(selection.element(), "src");
+	auto caps = gst_pad_query_caps(pad, nullptr);
+	CapabilitySelection capsSelection{caps};
+	auto capsFilter = capsSelection.highestRawArea(capsSelection.highestRawFrameRate());
+	Source source{selection.element(), capsFilter, "source"};
+
+	auto sink = gst_element_factory_make("autovideo", nullptr);
+
+	gst_bin_add_many(GST_BIN(pipeline), source, sink, nullptr);
+	gst_element_link_many(source, sink, nullptr);
+
+	gst_element_set_state(pipeline, GST_STATE_READY);
+	gst_element_get_state(pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
+	gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE, GST_MESSAGE_EOS);
+	gst_element_set_state(pipeline, GST_STATE_NULL);
+	gst_object_unref(pipeline);
+
+	ManualTestFeedback{"Are appropriate caps displayed?"};
+}
+
 TEST(GStreamerPipelineTest, DISABLED_SourceNegotiation)
 {
 	// Tests if a camera source can be capsfiltered
@@ -469,7 +563,6 @@ TEST(GStreamerPipelineTest, DISABLED_SourceCaps)
 	auto source = gst_element_factory_make("autovideosrc", nullptr);
 	if (source == nullptr)
 	{
-		gst_deinit();
 		FAIL() << "No auto video source found";
 	}
 	gst_element_set_state(source, GST_STATE_READY);
