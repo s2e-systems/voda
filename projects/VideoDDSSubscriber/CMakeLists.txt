@@ -25,8 +25,8 @@ add_executable(VideoDDSSubscriber
 	${SourceDir}/videoddssubscriber.cpp
 	${SourceDir}/videolistener.cpp
 	${CommonDir}/videowidgetgst.cpp
-	${CommonDir}/pipeline.cpp
 	${CommonDir}/qtgstreamer.cpp
+	${CommonDir}/pipeline.cpp
 	${CommonDir}/videowidgetgles2.cpp
 	${CommonDir}/videowidgetpaintergst.cpp
 )
@@ -37,7 +37,7 @@ include_directories(VideoDDSSubscriber
 )
 
 target_link_libraries(VideoDDSSubscriber
-	Qt5::Widgets 
-	GStreamer::gstreamer GStreamer::gobject GStreamer::glib GStreamer::base GStreamer::app GStreamer::video 
+	Qt5::Widgets
+	GStreamer::gstreamer GStreamer::gobject GStreamer::glib GStreamer::base GStreamer::app GStreamer::video
 	OpenSplice::ddskernel OpenSplice::dcpsisocpp2 OpenSplice::dcpssacpp
 )

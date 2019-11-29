@@ -19,8 +19,8 @@
 
 #include "videowidgetgst.h"
 #include "qtgstreamer.h"
-#include "pipeline.h"
 #include "videolistener.h"
+#include "pipeline.h"
 
 #include "videowidgetpaintergst.h"
 

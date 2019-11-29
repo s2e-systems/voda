@@ -27,8 +27,9 @@
 
 #include "videowidgetpaintergst.h"
 #include "elements.h"
-#include "pipeline.h"
 #include "cameracapabilities.h"
+#include "qtgstreamer.h"
+#include "pipeline.h"
 
 static const auto dataDirectory = "./data";
 

@@ -22,11 +22,10 @@ set_property(SOURCE ${OpenSplice_GENERATED_SOURCES} PROPERTY SKIP_AUTOMOC ON)
 add_executable(VideoDDSPublisher
 	${OpenSplice_GENERATED_SOURCES}
 	${SourceDir}/main.cpp
-	${SourceDir}/pipelinedds.cpp
 	${SourceDir}/videoddspublisher.cpp
 	${CommonDir}/videowidgetgst.cpp
-	${CommonDir}/pipeline.cpp
 	${CommonDir}/qtgstreamer.cpp
+	${CommonDir}/pipeline.cpp
 	${CommonDir}/videowidgetgles2.cpp
 	${CommonDir}/videowidgetpaintergst.cpp
 )
@@ -37,7 +36,7 @@ include_directories(VideoDDSPublisher
 )
 
 target_link_libraries(VideoDDSPublisher
-	Qt5::Widgets 
-	GStreamer::gstreamer GStreamer::glib GStreamer::gobject GStreamer::base GStreamer::app GStreamer::video 
+	Qt5::Widgets
+	GStreamer::gstreamer GStreamer::glib GStreamer::gobject GStreamer::base GStreamer::app GStreamer::video
 	OpenSplice::ddskernel OpenSplice::dcpsisocpp2 OpenSplice::dcpssacpp
 )

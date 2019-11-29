@@ -19,10 +19,70 @@
 
 #include "videowidgetgst.h"
 #include "qtgstreamer.h"
-#include "pipelinedds.h"
 #include "videowidgetpaintergst.h"
 #include "elements.h"
 #include "cameracapabilities.h"
+#include "pipeline.h"
+
+static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userData)
+{
+	Q_UNUSED(appSink)
+	bool dataWriterValid = false;
+	auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video>* >(userData);
+	if (dataWriter == nullptr)
+	{
+		dataWriterValid = false;
+	}
+	if (dataWriter->is_nil() == true)
+	{
+		qWarning() << "Data writer in Pipeline not valid";
+		dataWriterValid = false;
+	}
+	else
+	{
+		dataWriterValid = true;
+	}
+	//dataWriter->assert_liveliness();
+
+	const int userid = 0;
+	// Count the samples that have arrived. Used also to define the
+	// DDS msg number later
+	static int frameNum = 0;
+	frameNum++;
+
+	GstSample* sample = NULL;
+	GstBuffer* sampleBuffer = NULL;
+	GstMapInfo mapInfo;
+
+	// Pull a sample from the GStreamer pipeline
+	sample = gst_app_sink_pull_sample(appSink);
+	if(sample != NULL)
+	{
+		sampleBuffer = gst_sample_get_buffer(sample);
+		if(sampleBuffer != NULL && dataWriterValid == true)
+		{
+			gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
+
+			const int byteCount = mapInfo.size;
+			auto rawData = static_cast<uint8_t* >(mapInfo.data);
+			const std::vector<uint8_t> frame(rawData, rawData + byteCount);
+			const S2E::Video sample(userid, frameNum, frame);
+			*dataWriter << sample;
+			gst_buffer_unmap(sampleBuffer, &mapInfo);
+
+			qDebug() << "Send DDS msg" << frameNum << "with size of" << byteCount << "Bytes";
+
+		}
+		// The S2E::Video sample and the std::vector<uint8_t> frame are destroyed here.
+		// How ever the DDS system takes care that the necessary data stays alive.
+		// As such some data is compied around here.
+		// TODO: the copying may be avoided by using other function.
+		gst_sample_unref(sample);
+	}
+
+	return GST_FLOW_OK;
+}
+
 
 VideoDDSpublisher::VideoDDSpublisher(int &argc, char *argv[])
 	: QApplication(argc, argv)
@@ -258,7 +318,7 @@ void VideoDDSpublisher::initGstreamer()
 	gst_element_add_pad(GST_ELEMENT_CAST(encodereBin), gst_ghost_pad_new("sink", padFirstEncoder));
 	gst_object_unref(GST_OBJECT(padFirstEncoder));
 
-	g_signal_connect(ddsAppSink, "new-sample", G_CALLBACK(PipelineDDS::pullSampleAndSendViaDDS),
+	g_signal_connect(ddsAppSink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
 					 reinterpret_cast<gpointer>(&m_dataWriter));
 
 	///////////
