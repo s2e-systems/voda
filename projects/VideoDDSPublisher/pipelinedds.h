@@ -36,26 +36,6 @@ public:
 	PipelineDDS();
 
 	/**
-	 * Creates an AppSink GStreamer element that is returned added into a GstBin.
-	 * The returned bin can be used to be added in a GStremer pipline.
-	 * The AppSink gets the hard-coded name "AppSinkDDS". The appsink element can be
-	 * retrieved with that identifier with e.g. the gst_bin_get_by_name() function.
-	 *
-	 * The AppSink only accepts video/x-h264 data.
-	 *  TODO: May be this restriction is not neccessary here. The cap might
-	 *   be made fixed at another place. As such arbitrary dat could be sent from
-	 *   a GStreamer pipeline
-	 *
-	 * The AppSink's parameters are configured such that no buffers are buffered
-	 * and are dropped if buffers are arriving faster then they are pulled.
-	 *
-	 * The PipelineDDS::pullSampleAndSendViaDDS() function is connected to
-	 * the "new-sample" event of the AppSink. This allows immediate action
-	 * to pullout an arrive sample that can be pushed into the DDS writer.
-	 */
-	GstBin* createAppSinkForDDS();
-
-	/**
 	 * Set the DDS data writer that is used by pullSampleAndSendViaDDS() to
 	 * send the data from the GStreamer buffers into DDS
 	 */

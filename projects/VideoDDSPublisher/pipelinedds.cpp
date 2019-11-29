@@ -22,35 +22,6 @@ PipelineDDS::PipelineDDS() :
 }
 
 
-GstBin* PipelineDDS::createAppSinkForDDS()
-{
-	GstElement* appSink;
-	GstBin* bin;
-	GstCaps* caps;
-
-	bin = binFromDescription("appsink name=AppSinkDDS",
-							 "AppSinkForDdsBin");
-
-	appSink = gst_bin_get_by_name(bin, "AppSinkDDS");
-	caps = gst_caps_new_simple("video/x-h264",
-		"stream-format", G_TYPE_STRING, "byte-stream",
-		"alignment", G_TYPE_STRING, "au",
-		nullptr);
-	g_object_set(appSink,
-				 "emit-signals", TRUE,
-				 "caps", caps,
-				 "max-buffers", 1,
-				 "drop", FALSE,
-				 "sync", FALSE,
-				NULL);
-
-	g_signal_connect(appSink, "new-sample", G_CALLBACK(PipelineDDS::pullSampleAndSendViaDDS),
-					 reinterpret_cast<gpointer>(&m_dataWriter));
-
-	return bin;
-}
-
-
 GstFlowReturn PipelineDDS::pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userData)
 {
 	Q_UNUSED(appSink)
