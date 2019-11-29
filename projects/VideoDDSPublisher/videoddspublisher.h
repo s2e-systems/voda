@@ -106,7 +106,6 @@ protected:
 private:
 
 	QMainWindow* m_mainwindow;
-	PipelineDDS* m_pipeline;
 
 	/** Data writer: must be initialized since the construtor is private */
 	dds::pub::DataWriter<S2E::Video> m_dataWriter;

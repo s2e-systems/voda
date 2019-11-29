@@ -27,7 +27,6 @@
 VideoDDSpublisher::VideoDDSpublisher(int &argc, char *argv[])
 	: QApplication(argc, argv)
 	, m_mainwindow(nullptr)
-	, m_pipeline(nullptr)
 	, m_dataWriter(dds::core::null)
 	, m_useTestSrc(false)
 	, m_useOmx(false)
@@ -124,8 +123,7 @@ void VideoDDSpublisher::initGstreamer()
 
 	gst_element_set_state(sourceSelection.element(), GST_STATE_READY);
 	gst_element_get_state(sourceSelection.element(), nullptr /*state*/, nullptr /*pending*/, GST_CLOCK_TIME_NONE);
-	auto pad = gst_element_get_static_pad(sourceSelection.element(), "src");
-	auto caps = gst_pad_query_caps(pad, nullptr);
+	auto caps = gst_pad_query_caps(gst_element_get_static_pad(sourceSelection.element(), "src"), nullptr);
 
 	GstCaps *capsFilter = nullptr;
 
@@ -168,7 +166,33 @@ void VideoDDSpublisher::initGstreamer()
 	gst_bin_add(sourceBin, converter);
 	gst_element_link(filter, converter);
 
+	auto padLastSource = gst_element_get_static_pad(converter, "src");
+	gst_element_add_pad(GST_ELEMENT_CAST(sourceBin), gst_ghost_pad_new("src", padLastSource));
+	gst_object_unref(GST_OBJECT(padLastSource));
+
+
 	//////////////
+	// DDS
+
+	auto encodereBin = GST_BIN_CAST(gst_bin_new("encodereBin"));
+
+	auto ddsAppSink = gst_element_factory_make("appsink", nullptr);
+	gst_bin_add(encodereBin, ddsAppSink);
+	auto ddsSinkCaps = gst_caps_new_simple("video/x-h264",
+		"stream-format", G_TYPE_STRING, "byte-stream",
+		"alignment", G_TYPE_STRING, "au",
+		nullptr
+	);
+
+	g_object_set(ddsAppSink,
+		"emit-signals", true,
+		"caps", ddsSinkCaps,
+		"max-buffers", 1,
+		"drop", false,
+		"sync", false,
+		nullptr
+	);
+
 	// Encoder
 
 	GstElementFactory* factory = nullptr;
@@ -190,9 +214,7 @@ void VideoDDSpublisher::initGstreamer()
 	const int kilobitrate = 1280;
 	const int keyframedistance = 30;
 
-	auto encodereBin = GST_BIN_CAST(gst_bin_new("encodereBin"));
 	gst_bin_add(encodereBin, encoder);
-
 	if (encoderName == "avenc_h264_omx")
 	{
 		g_object_set(encoder,
@@ -206,6 +228,7 @@ void VideoDDSpublisher::initGstreamer()
 		g_object_set(parser, "config-interval", gint(-1), nullptr);
 		gst_bin_add(encodereBin, parser);
 		gst_element_link(encoder, parser);
+		gst_element_link(parser, ddsAppSink);
 	}
 	else
 	if (encoderName == "x264enc")
@@ -222,32 +245,18 @@ void VideoDDSpublisher::initGstreamer()
 			"aud", gboolean(false), // Use AU (Access Unit) delimiter
 			nullptr
 		);
+		gst_element_link(encoder, ddsAppSink);
 	}
 	else
 	{
 		throw std::runtime_error("Encoder not valid");
 	}
 
-	///////////
-	// DDS
 
-	auto ddsBin = GST_BIN_CAST(gst_bin_new("senderBin"));
-	auto ddsAppSink = gst_element_factory_make("appsink", nullptr);
-	gst_bin_add(ddsBin, ddsAppSink);
-	auto ddsSinkCaps = gst_caps_new_simple("video/x-h264",
-		"stream-format", G_TYPE_STRING, "byte-stream",
-		"alignment", G_TYPE_STRING, "au",
-		nullptr
-	);
 
-	g_object_set(ddsAppSink,
-		"emit-signals", true,
-		"caps", ddsSinkCaps,
-		"max-buffers", 1,
-		"drop", false,
-		"sync", false,
-		nullptr
-	);
+	auto padFirstEncoder = gst_element_get_static_pad(encoder, "sink");
+	gst_element_add_pad(GST_ELEMENT_CAST(encodereBin), gst_ghost_pad_new("sink", padFirstEncoder));
+	gst_object_unref(GST_OBJECT(padFirstEncoder));
 
 	g_signal_connect(ddsAppSink, "new-sample", G_CALLBACK(PipelineDDS::pullSampleAndSendViaDDS),
 					 reinterpret_cast<gpointer>(&m_dataWriter));
@@ -273,31 +282,54 @@ void VideoDDSpublisher::initGstreamer()
 	);
 	gst_element_link(displayConverter, displayAppSink);
 
+	auto padFirstDisplay = gst_element_get_static_pad(displayConverter, "sink");
+	gst_element_add_pad(GST_ELEMENT_CAST(displayBin), gst_ghost_pad_new("sink", padFirstDisplay));
+	gst_object_unref(GST_OBJECT(padFirstDisplay));
+
 	///////////
-	// Bring the bins together
+	// Create pipeline and bring the bins together
 
-	if (m_pipeline != nullptr)
+	auto pipeline = gst_pipeline_new("publisher");
+	auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+	gst_bus_set_sync_handler(bus, Pipeline::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
+	gst_object_unref(bus);
+
+	auto tee = gst_element_factory_make("tee", nullptr);
+	auto queue0 = gst_element_factory_make("queue", nullptr);
+	auto queue1 = gst_element_factory_make("queue", nullptr);
+
+	gst_bin_add(GST_BIN_CAST(pipeline), GST_ELEMENT_CAST(sourceBin));
+	gst_bin_add(GST_BIN_CAST(pipeline), tee);
+	gst_bin_add(GST_BIN_CAST(pipeline), queue0);
+	gst_bin_add(GST_BIN_CAST(pipeline), queue1);
+	gst_bin_add(GST_BIN_CAST(pipeline), GST_ELEMENT_CAST(encodereBin));
+	gst_bin_add(GST_BIN_CAST(pipeline), GST_ELEMENT_CAST(displayBin));
+
+	auto boolret = gst_element_link(GST_ELEMENT_CAST(sourceBin), tee);
+	boolret &= gst_element_link(queue0, GST_ELEMENT_CAST(encodereBin));
+	boolret &= gst_element_link(queue1, GST_ELEMENT_CAST(displayBin));
+	boolret &= gst_element_link_pads(tee, "src_0", queue0, "sink");
+	boolret &= gst_element_link_pads(tee, "src_1", queue1, "sink");
+
+	if (boolret != true)
 	{
-		m_pipeline->createPipeline("VideoDDSPublisher");
-
-		m_pipeline->setSrcBinI(sourceBin);
-		m_pipeline->setSinkBinMainI(encodereBin);
-
-		m_pipeline->setSinkBinMainII(ddsBin);
-		m_pipeline->setSinkBinSecondary(displayBin);
-		m_pipeline->linkPipeline();
-
-		widget->installAppSink(GST_APP_SINK_CAST(displayAppSink));
-
-		m_pipeline->setDataWriter(m_dataWriter);
-		m_pipeline->startPipeline();
+		qWarning() << "Linking pipeline failed!";
 	}
+
+	widget->installAppSink(GST_APP_SINK_CAST(displayAppSink));
+
+	auto pipelineStartSucess = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
+	{
+		qWarning() << "Set pipeline to playing failed";
+		gst_bus_set_flushing(bus, true);
+	}
+
 	widget->show();
 }
 
 void VideoDDSpublisher::init()
 {
-	m_pipeline = new PipelineDDS();
 	initDDS("VideoStream");
 	initGstreamer();
 }
