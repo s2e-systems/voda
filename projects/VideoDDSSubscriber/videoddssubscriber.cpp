@@ -47,25 +47,64 @@ void VideoDDSsubscriber::init()
 	m_pipeline = new Pipeline();
 	m_pipeline->createPipeline("VideoDDSsubscriber");
 
-	m_pipeline->setSrcBinI(m_pipeline->createAppSrc());
+	auto srcCaps = gst_caps_new_simple("video/x-h264",
+		"stream-format", G_TYPE_STRING, "byte-stream",
+		"alignment", G_TYPE_STRING, "au",
+		nullptr
+	);
 
+	auto appSrc = gst_element_factory_make("appsrc", nullptr);
+	g_object_set(appSrc,
+		"caps", srcCaps,
+		"is-live", true,
+		"format", GST_FORMAT_TIME,
+		nullptr
+	);
+
+	auto decoderBin = GST_BIN_CAST(gst_bin_new("decoderBin"));
+	gst_bin_add(decoderBin, appSrc);
+
+	GstElement* decoder = nullptr;
 	if (m_useOmx == true)
 	{
-		m_pipeline->setSrcBinII(m_pipeline->createOmxDecoder());
+		decoder = gst_element_factory_make("omxh264dec", nullptr);
 	}
 	else
 	{
-		m_pipeline->setSrcBinII(m_pipeline->createAvDecoder());
+		decoder = gst_element_factory_make("avdec_h264", nullptr);
 	}
 
-	m_pipeline->setSinkBinMainI(m_pipeline->createAppSink());
+	gst_bin_add(decoderBin, decoder);
+	gst_element_link(appSrc, decoder);
+
+	m_pipeline->setSrcBinI(GST_BIN_CAST(decoderBin));
+
+	auto displayBin = GST_BIN_CAST(gst_bin_new("displayBin"));
+	auto displayConverter = gst_element_factory_make("videoconvert", nullptr);
+	auto displayAppSink = gst_element_factory_make("appsink", nullptr);
+	gst_bin_add(displayBin, displayConverter);
+	gst_bin_add(displayBin, displayAppSink);
+	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
+		"format", G_TYPE_STRING, "RGBA",
+		nullptr
+	);
+	g_object_set(displayAppSink,
+		"caps", displaySinkCaps,
+		"max-buffers", 1,
+		"drop", true,
+		"sync", false,
+		nullptr
+	);
+	gst_element_link(displayConverter, displayAppSink);
+
+	m_pipeline->setSinkBinMainI(displayBin);
 	m_pipeline->linkPipeline();
 
-	widget->installAppSink(m_pipeline->appSink());
+	widget->installAppSink(GST_APP_SINK_CAST(displayAppSink));
 
 	if (m_videoListener != nullptr)
 	{
-		m_videoListener->installAppSrc(m_pipeline->appSrc());
+		m_videoListener->installAppSrc(GST_APP_SRC_CAST(appSrc));
 	}
 
 
