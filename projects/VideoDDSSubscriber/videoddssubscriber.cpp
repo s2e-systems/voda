@@ -27,7 +27,6 @@
 VideoDDSsubscriber::VideoDDSsubscriber(int& argc, char** argv) :
 	QApplication(argc, argv)
 	,m_videoListener(nullptr)
-	,m_pipeline(nullptr)
 	,m_dr(dds::core::null)
 	,m_useOmx(false)
 {
@@ -44,8 +43,10 @@ void VideoDDSsubscriber::init()
 	QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
 	QtGStreamer::instance()->init();
 
-	m_pipeline = new Pipeline();
-	m_pipeline->createPipeline("VideoDDSsubscriber");
+	auto pipeline = gst_pipeline_new("subscriber");
+	auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+	gst_bus_set_sync_handler(bus, Pipeline::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
+	gst_object_unref(bus);
 
 	auto srcCaps = gst_caps_new_simple("video/x-h264",
 		"stream-format", G_TYPE_STRING, "byte-stream",
@@ -61,8 +62,7 @@ void VideoDDSsubscriber::init()
 		nullptr
 	);
 
-	auto decoderBin = GST_BIN_CAST(gst_bin_new("decoderBin"));
-	gst_bin_add(decoderBin, appSrc);
+	gst_bin_add(GST_BIN_CAST(pipeline), appSrc);
 
 	GstElement* decoder = nullptr;
 	if (m_useOmx == true)
@@ -74,33 +74,28 @@ void VideoDDSsubscriber::init()
 		decoder = gst_element_factory_make("avdec_h264", nullptr);
 	}
 
-	gst_bin_add(decoderBin, decoder);
+	gst_bin_add(GST_BIN_CAST(pipeline), decoder);
 	gst_element_link(appSrc, decoder);
 
-	m_pipeline->setSrcBinI(GST_BIN_CAST(decoderBin));
-
-	auto displayBin = GST_BIN_CAST(gst_bin_new("displayBin"));
-	auto displayConverter = gst_element_factory_make("videoconvert", nullptr);
-	auto displayAppSink = gst_element_factory_make("appsink", nullptr);
-	gst_bin_add(displayBin, displayConverter);
-	gst_bin_add(displayBin, displayAppSink);
+	auto converter = gst_element_factory_make("videoconvert", nullptr);
+	auto appSink = gst_element_factory_make("appsink", nullptr);
+	gst_bin_add(GST_BIN_CAST(pipeline), converter);
+	gst_bin_add(GST_BIN_CAST(pipeline), appSink);
 	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
 		"format", G_TYPE_STRING, "RGBA",
 		nullptr
 	);
-	g_object_set(displayAppSink,
+	g_object_set(appSink,
 		"caps", displaySinkCaps,
 		"max-buffers", 1,
 		"drop", true,
 		"sync", false,
 		nullptr
 	);
-	gst_element_link(displayConverter, displayAppSink);
+	gst_element_link(decoder, converter);
+	gst_element_link(converter, appSink);
 
-	m_pipeline->setSinkBinMainI(displayBin);
-	m_pipeline->linkPipeline();
-
-	widget->installAppSink(GST_APP_SINK_CAST(displayAppSink));
+	widget->installAppSink(GST_APP_SINK_CAST(appSink));
 
 	if (m_videoListener != nullptr)
 	{
@@ -110,7 +105,12 @@ void VideoDDSsubscriber::init()
 
 	widget->show();
 
-	m_pipeline->startPipeline();
+	auto pipelineStartSucess = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
+	{
+		qWarning() << "Set pipeline to playing failed";
+		gst_bus_set_flushing(bus, true);
+	}
 }
 
 void VideoDDSsubscriber::initDDS(const QString& topicName)
