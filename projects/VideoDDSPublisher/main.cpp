@@ -29,6 +29,12 @@ int main(int argc, char *argv[])
 	QCommandLineOption useTestSrcOption("testsrc", "Use test src, instead of autovideosrc.");
 	parser.addOption(useTestSrcOption);
 
+	QCommandLineOption useOmxOption("omx", "Use omx as the encoder.");
+	parser.addOption(useOmxOption);
+
+	QCommandLineOption useFixedCapsOption("fixed", "Use fixed capabilities for the camera source.");
+	parser.addOption(useFixedCapsOption);
+
 	QCommandLineOption strengthOption("strength", "Set DDS OwnershipStrength (The higher the number the more stregnth).", "[0 1500]", "1000");
 	parser.addOption(strengthOption);
 
@@ -37,6 +43,8 @@ int main(int argc, char *argv[])
 	parser.process(application);
 
 	application.setUseTestSrc(parser.isSet(useTestSrcOption));
+	application.setUseOmx(parser.isSet(useOmxOption));
+	application.setUseFixedCaps(parser.isSet(useFixedCapsOption));
 	application.setStrength(parser.value(strengthOption).toInt());
 
 	qDebug() << "This is" << application.applicationName();

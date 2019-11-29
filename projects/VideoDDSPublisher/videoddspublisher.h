@@ -84,6 +84,16 @@ public:
 	void setUseTestSrc(bool useTestSrc);
 
 	/**
+	 * These methods enable the use of the OMX hardware decoder on the
+	 * RaspberryPi. The hardware encoder is needed for undelayed video
+	 * processing on the Pi.
+	 */
+	bool useOmx() const;
+	void setUseOmx(bool useOmx);
+
+	void setUseFixedCaps(bool useFixedCaps);
+
+	/**
 	 * These methods define the ownership strength of the topic.
 	 * Higher ownership strength means a higher priority for the sender
 	 */
@@ -103,6 +113,7 @@ private:
 
 	bool m_useTestSrc;
 	bool m_useOmx;
+	bool m_useFixedCaps;
 	int m_strength;
 };
 

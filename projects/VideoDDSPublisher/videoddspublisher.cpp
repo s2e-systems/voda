@@ -24,20 +24,20 @@
 #include "elements.h"
 #include "cameracapabilities.h"
 
-VideoDDSpublisher::VideoDDSpublisher(int& argc, char* argv[])
-	:QApplication(argc, argv)
-	,m_mainwindow(nullptr)
-	,m_pipeline(nullptr)
-	,m_dataWriter(dds::core::null)
-	,m_useTestSrc(false)
-	,m_useOmx(false)
-	,m_strength(0)
+VideoDDSpublisher::VideoDDSpublisher(int &argc, char *argv[])
+	: QApplication(argc, argv)
+	, m_mainwindow(nullptr)
+	, m_pipeline(nullptr)
+	, m_dataWriter(dds::core::null)
+	, m_useTestSrc(false)
+	, m_useOmx(false)
+	, m_useFixedCaps(false)
+	, m_strength(0)
 {
 	setApplicationName("Video DDS Publisher");
 }
 
-
-void VideoDDSpublisher::initDDS(const QString& topicName)
+void VideoDDSpublisher::initDDS(const QString &topicName)
 {
 	// OpenDplice uses an error throwing mechanism, some of the possible
 	// error types that may be thrown from the used function are
@@ -51,8 +51,7 @@ void VideoDDSpublisher::initDDS(const QString& topicName)
 		// The exclusive ownership allows the use of the ownership strength to define which video source is used.
 		// The liveliness topic determines how to long to wait until the source with lower strength is used
 		// when messages are not received from the source with higher ownership strength.
-		dds::topic::qos::TopicQos topicQos
-		= dp.default_topic_qos();
+		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
 		//	The dds::core::policy::Liveliness qos setting had been previously added here and is now
 		// (probably) at the data writer QoS. This was done to prevent a crash that was caused
 		// by having the dataReader without the Liveliness setting
@@ -73,28 +72,27 @@ void VideoDDSpublisher::initDDS(const QString& topicName)
 
 		m_dataWriter = dds::pub::DataWriter<S2E::Video>(pub, topic, dwqos);
 	}
-	catch(const dds::core::OutOfResourcesError& e)
+	catch (const dds::core::OutOfResourcesError &e)
 	{
 		qCritical("DDS OutOfResourcesError: %s", e.what());
 	}
-	catch(const dds::core::InvalidArgumentError& e)
+	catch (const dds::core::InvalidArgumentError &e)
 	{
 		qCritical("DDS InvalidArgumentError: %s", e.what());
 	}
-	catch(const dds::core::NullReferenceError& e)
+	catch (const dds::core::NullReferenceError &e)
 	{
 		qCritical("DDS NullReferenceError: %s", e.what());
 	}
-	catch(const dds::core::Error& e)
+	catch (const dds::core::Error &e)
 	{
 		qCritical("DDS Error: %s", e.what());
 	}
-	catch(...)
+	catch (...)
 	{
 		qCritical("DDS initialization failed with unhandled exeption");
 	}
 }
-
 
 void VideoDDSpublisher::initGstreamer()
 {
@@ -125,43 +123,40 @@ void VideoDDSpublisher::initGstreamer()
 	qDebug() << "selected source element: " << QString::fromStdString(sourceSelection.elementName());
 
 	gst_element_set_state(sourceSelection.element(), GST_STATE_READY);
-	gst_element_get_state(sourceSelection.element(), nullptr/*state*/, nullptr/*pending*/, GST_CLOCK_TIME_NONE);
+	gst_element_get_state(sourceSelection.element(), nullptr /*state*/, nullptr /*pending*/, GST_CLOCK_TIME_NONE);
 	auto pad = gst_element_get_static_pad(sourceSelection.element(), "src");
 	auto caps = gst_pad_query_caps(pad, nullptr);
 
-	GstCaps* capsFilter = nullptr;
+	GstCaps *capsFilter = nullptr;
+
+	if (m_useFixedCaps)
+	{
+		qDebug() << "Using fixed capabilities";
+		capsFilter = gst_caps_new_simple("video/x-raw",
+										 "width", G_TYPE_INT, 640,
+										 "height", G_TYPE_INT, 480,
+										 "framerate", GST_TYPE_FRACTION, 30, 1,
+										 nullptr);
+	}
+	else
 	if (m_useTestSrc || sourceSelection.elementName() == "videotestsrc")
 	{
+		qDebug() << "Using fixed capabilities for test source";
 		capsFilter = gst_caps_new_simple("video/x-raw",
-			"format", G_TYPE_STRING, "I420",
-			"width", G_TYPE_INT, 640,
-			"height", G_TYPE_INT, 480,
-			"framerate", GST_TYPE_FRACTION, 30, 1,
-			nullptr
-		);
+										 "format", G_TYPE_STRING, "I420",
+										 "width", G_TYPE_INT, 640,
+										 "height", G_TYPE_INT, 480,
+										 "framerate", GST_TYPE_FRACTION, 30, 1,
+										 nullptr);
 	}
 	else
 	{
 		CapabilitySelection capsSelection{caps};
 		const auto framerate = capsSelection.highestRawFrameRate();
-		// If the framerate is very high, it is likely to be not supported by the
-		// encoder or the detection went wrong. In this case try a conservative
-		// video format
-		if (framerate < 50.0)
-		{
-			capsFilter = capsSelection.highestRawArea(framerate);
-		}
-		else
-		{
-			capsFilter = gst_caps_new_simple("video/x-raw",
-				"width", G_TYPE_INT, 640,
-				"height", G_TYPE_INT, 480,
-				"framerate", GST_TYPE_FRACTION, 30, 1,
-				nullptr
-			);
-		}
+		qDebug() << "Detected highest framerate as:" << framerate << "and use this to determine highest pixel area";
+		capsFilter = capsSelection.highestRawArea(framerate);
 	}
-	qDebug() << "Capabilities for the source element:" <<  gst_caps_to_string(capsFilter);
+	qDebug() << "Usiing following capabilities for the source element:" << gst_caps_to_string(capsFilter);
 
 	auto sourceBin = GST_BIN_CAST(gst_bin_new("sourceBin"));
 	gst_bin_add(sourceBin, sourceSelection.element());
@@ -173,47 +168,24 @@ void VideoDDSpublisher::initGstreamer()
 	gst_bin_add(sourceBin, converter);
 	gst_element_link(filter, converter);
 
-
 	//////////////
 	// Encoder
 
-	GstElement* encoder = nullptr;
-	// Test if the encoder works with the source caps
-	bool tryOther = true;
-	auto factory = gst_element_factory_find("avenc_h264_omx");
-	if (factory != nullptr)
+	GstElementFactory* factory = nullptr;
+	if (m_useOmx)
 	{
-		auto encoderTestBin = gst_bin_new("encoderTestBin");
-		auto testsrc = gst_element_factory_make("videotestsrc", nullptr);
-		encoder = gst_element_factory_create(factory, nullptr);
-		auto fakesink = gst_element_factory_make("fakesink", nullptr);
-		gst_bin_add(GST_BIN_CAST(encoderTestBin), testsrc);
-		gst_bin_add(GST_BIN_CAST(encoderTestBin), encoder);
-		gst_bin_add(GST_BIN_CAST(encoderTestBin), fakesink);
-		const auto linkRet1 = gst_element_link_filtered(testsrc, encoder, capsFilter);
-		const auto linkRet2 = gst_element_link(encoder, fakesink);
-		const auto ret = gst_element_set_state(GST_ELEMENT_CAST(encoderTestBin), GST_STATE_PAUSED);
-		if (linkRet1 && linkRet2 && ret == GST_STATE_CHANGE_SUCCESS)
-		{
-			tryOther = false;
-		}
-		gst_element_set_state(GST_ELEMENT_CAST(encoderTestBin), GST_STATE_NULL);
+		factory = gst_element_factory_find("avenc_h264_omx");
 	}
-	if (tryOther)
+	else
 	{
 		factory = gst_element_factory_find("x264enc");
-		if (factory != nullptr)
-		{
-			encoder = gst_element_factory_create(factory, nullptr);
-		}
-		else
-		{
-			throw std::runtime_error{"No working encoder found"};
-		}
 	}
-
+	if (factory == nullptr)
+	{
+		throw std::runtime_error{"No existing encoder found"};
+	}
+	auto encoder = gst_element_factory_create(factory, nullptr);
 	const std::string encoderName = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(gst_element_get_factory(encoder)));
-	qDebug() << "selected encoder gstreamer element: " << QString::fromStdString(encoderName);
 
 	const int kilobitrate = 1280;
 	const int keyframedistance = 30;
@@ -225,7 +197,7 @@ void VideoDDSpublisher::initGstreamer()
 	{
 		g_object_set(encoder,
 			"bitrate", gint64(kilobitrate * 1000), //set bitrate (in bits/s)
-			"gop-size", gint(keyframedistance), //set the group of picture (GOP) size
+			"gop-size", gint(keyframedistance),	//set the group of picture (GOP) size
 			nullptr
 		);
 		// The avenc_h264_omx does not send the PPS/SPS with the IDR frames
@@ -235,14 +207,15 @@ void VideoDDSpublisher::initGstreamer()
 		gst_bin_add(encodereBin, parser);
 		gst_element_link(encoder, parser);
 	}
+	else
 	if (encoderName == "x264enc")
 	{
 		g_object_set(encoder,
-			"bitrate", guint(kilobitrate), // Bitrate in kbit/sec
-			"vbv-buf-capacity", guint(2000), // Size of the VBV buffer in milliseconds
+			"bitrate", guint(kilobitrate),			 // Bitrate in kbit/sec
+			"vbv-buf-capacity", guint(2000),		 // Size of the VBV buffer in milliseconds
 			"key-int-max", guint(keyframedistance), // Maximal distance between two key-frames (0 for automatic)
-			"threads", guint(1), // Number of threads used by the codec (0 for automatic)
-			"sliced-threads", gboolean(false), // Low latency but lower efficiency threading
+			"threads", guint(1),					 // Number of threads used by the codec (0 for automatic)
+			"sliced-threads", gboolean(false),		 // Low latency but lower efficiency threading
 			"insert-vui", gboolean(false),
 			"speed-preset", 1, // Preset name for speed/quality tradeoff options
 			"trellis", gboolean(false),
@@ -250,9 +223,58 @@ void VideoDDSpublisher::initGstreamer()
 			nullptr
 		);
 	}
+	else
+	{
+		throw std::runtime_error("Encoder not valid");
+	}
 
 	///////////
-	// Display and transmission
+	// DDS
+
+	auto ddsBin = GST_BIN_CAST(gst_bin_new("senderBin"));
+	auto ddsAppSink = gst_element_factory_make("appsink", nullptr);
+	gst_bin_add(ddsBin, ddsAppSink);
+	auto ddsSinkCaps = gst_caps_new_simple("video/x-h264",
+		"stream-format", G_TYPE_STRING, "byte-stream",
+		"alignment", G_TYPE_STRING, "au",
+		nullptr
+	);
+
+	g_object_set(ddsAppSink,
+		"emit-signals", true,
+		"caps", ddsSinkCaps,
+		"max-buffers", 1,
+		"drop", false,
+		"sync", false,
+		nullptr
+	);
+
+	g_signal_connect(ddsAppSink, "new-sample", G_CALLBACK(PipelineDDS::pullSampleAndSendViaDDS),
+					 reinterpret_cast<gpointer>(&m_dataWriter));
+
+	///////////
+	// Display
+
+	auto displayBin = GST_BIN_CAST(gst_bin_new("displayBin"));
+	auto displayConverter = gst_element_factory_make("videoconvert", nullptr);
+	auto displayAppSink = gst_element_factory_make("appsink", nullptr);
+	gst_bin_add(displayBin, displayConverter);
+	gst_bin_add(displayBin, displayAppSink);
+	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
+		"format", G_TYPE_STRING, "RGBA",
+		nullptr
+	);
+	g_object_set(displayAppSink,
+		"caps", displaySinkCaps,
+		"max-buffers", 1,
+		"drop", true,
+		"sync", false,
+		nullptr
+	);
+	gst_element_link(displayConverter, displayAppSink);
+
+	///////////
+	// Bring the bins together
 
 	if (m_pipeline != nullptr)
 	{
@@ -261,11 +283,11 @@ void VideoDDSpublisher::initGstreamer()
 		m_pipeline->setSrcBinI(sourceBin);
 		m_pipeline->setSinkBinMainI(encodereBin);
 
-		m_pipeline->setSinkBinMainII(m_pipeline->createAppSinkForDDS());
-		m_pipeline->setSinkBinSecondary(m_pipeline->createAppSink());
+		m_pipeline->setSinkBinMainII(ddsBin);
+		m_pipeline->setSinkBinSecondary(displayBin);
 		m_pipeline->linkPipeline();
 
-		widget->installAppSink(m_pipeline->appSink("AppSink"));
+		widget->installAppSink(GST_APP_SINK_CAST(displayAppSink));
 
 		m_pipeline->setDataWriter(m_dataWriter);
 		m_pipeline->startPipeline();
@@ -290,6 +312,21 @@ void VideoDDSpublisher::setUseTestSrc(bool useTestSrc)
 	m_useTestSrc = useTestSrc;
 }
 
+bool VideoDDSpublisher::useOmx() const
+{
+	return m_useOmx;
+}
+
+void VideoDDSpublisher::setUseOmx(bool useOmx)
+{
+	m_useOmx = useOmx;
+}
+
+void VideoDDSpublisher::setUseFixedCaps(bool useFixedCaps)
+{
+	m_useFixedCaps = useFixedCaps;
+}
+
 int VideoDDSpublisher::strength() const
 {
 	return m_strength;
@@ -299,4 +336,3 @@ void VideoDDSpublisher::setStrength(int strength)
 {
 	m_strength = strength;
 }
-
