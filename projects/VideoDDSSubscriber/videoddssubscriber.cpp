@@ -16,8 +16,6 @@
 
 #include <QDebug>
 
-
-#include "videowidgetgst.h"
 #include "qtgstreamer.h"
 #include "videolistener.h"
 #include "pipeline.h"

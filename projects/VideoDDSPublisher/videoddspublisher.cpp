@@ -17,7 +17,6 @@
 #include <QDebug>
 #include <QSize>
 
-#include "videowidgetgst.h"
 #include "qtgstreamer.h"
 #include "videowidgetpaintergst.h"
 #include "elements.h"
