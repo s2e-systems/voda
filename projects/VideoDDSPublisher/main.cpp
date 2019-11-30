@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <QApplication>
+#include <QCommandLineParser>
 #include <QDebug>
 
 #include "videoddspublisher.h"
-#include <QCommandLineParser>
 
 int main(int argc, char *argv[])
 {
-	VideoDDSpublisher application(argc, argv);
+	QApplication application(argc, argv);
+	application.setApplicationName("Video DDS Publisher");
+	qDebug() << "This is" << application.applicationName();
 
 	QCommandLineParser parser;
 	parser.setApplicationDescription("VideoDDSpublisher");
@@ -38,17 +41,9 @@ int main(int argc, char *argv[])
 	QCommandLineOption strengthOption("strength", "Set DDS OwnershipStrength (The higher the number the more stregnth).", "[0 1500]", "1000");
 	parser.addOption(strengthOption);
 
-
-
 	parser.process(application);
 
-	application.setUseTestSrc(parser.isSet(useTestSrcOption));
-	application.setUseOmx(parser.isSet(useOmxOption));
-	application.setUseFixedCaps(parser.isSet(useFixedCapsOption));
-	application.setStrength(parser.value(strengthOption).toInt());
+	VideoDDSpublisher pub{parser.isSet(useTestSrcOption), parser.isSet(useOmxOption), parser.isSet(useFixedCapsOption), parser.value(strengthOption).toInt()};
 
-	qDebug() << "This is" << application.applicationName();
-
-	application.init();
 	return application.exec();
 }

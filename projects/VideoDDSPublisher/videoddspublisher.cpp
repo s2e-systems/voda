@@ -83,20 +83,11 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 }
 
 
-VideoDDSpublisher::VideoDDSpublisher(int &argc, char *argv[])
-	: QApplication(argc, argv)
-	, m_mainwindow(nullptr)
-	, m_dataWriter(dds::core::null)
-	, m_useTestSrc(false)
-	, m_useOmx(false)
-	, m_useFixedCaps(false)
-	, m_strength(0)
+VideoDDSpublisher::VideoDDSpublisher(bool useTestSrc, bool useOmx, bool useFixedCaps, int strength)
+	: m_dataWriter(dds::core::null)
 {
-	setApplicationName("Video DDS Publisher");
-}
 
-void VideoDDSpublisher::initDDS(const QString &topicName)
-{
+	const std::string topicName = "VideoStream";
 	// OpenDplice uses an error throwing mechanism, some of the possible
 	// error types that may be thrown from the used function are
 	// catched below
@@ -117,43 +108,45 @@ void VideoDDSpublisher::initDDS(const QString &topicName)
 		//	<< dds::core::policy::Durability::Volatile()
 		//	<< dds::core::policy::Reliability::BestEffort();
 
-		dds::topic::Topic<S2E::Video> topic(dp, topicName.toStdString(), topicQos);
+		dds::topic::Topic<S2E::Video> topic(dp, topicName, topicQos);
 
 		dds::pub::qos::PublisherQos pubQos = dp.default_publisher_qos();
 		dds::pub::Publisher pub(dp, pubQos);
 
 		dds::pub::qos::DataWriterQos dwqos = topic.qos();
-		dwqos << dds::core::policy::OwnershipStrength(m_strength);
+		dwqos << dds::core::policy::OwnershipStrength(strength);
 		dwqos << dds::core::policy::WriterDataLifecycle::AutoDisposeUnregisteredInstances();
 		dwqos << dds::core::policy::Ownership::Exclusive();
 		dwqos << dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(1000));
 
 		m_dataWriter = dds::pub::DataWriter<S2E::Video>(pub, topic, dwqos);
 	}
-	catch (const dds::core::OutOfResourcesError &e)
+	catch (const dds::core::OutOfResourcesError& e)
 	{
-		qCritical("DDS OutOfResourcesError: %s", e.what());
+		qFatal("DDS OutOfResourcesError: %s", e.what());
 	}
-	catch (const dds::core::InvalidArgumentError &e)
+	catch (const dds::core::InvalidArgumentError& e)
 	{
-		qCritical("DDS InvalidArgumentError: %s", e.what());
+		qFatal("DDS InvalidArgumentError: %s", e.what());
 	}
-	catch (const dds::core::NullReferenceError &e)
+	catch (const dds::core::NullReferenceError& e)
 	{
-		qCritical("DDS NullReferenceError: %s", e.what());
+		qFatal("DDS NullReferenceError: %s", e.what());
 	}
-	catch (const dds::core::Error &e)
+	catch (const dds::core::Error& e)
 	{
-		qCritical("DDS Error: %s", e.what());
+		qFatal("DDS Error: %s", e.what());
 	}
 	catch (...)
 	{
-		qCritical("DDS initialization failed with unhandled exeption");
+		qFatal("DDS initialization failed with unhandled exeption");
 	}
-}
 
-void VideoDDSpublisher::initGstreamer()
-{
+
+
+	///////////
+	// Gtreamer
+
 	auto widget = new VideoWidgetPainterGst();
 
 	// The message handler must be installed before GStreamer
@@ -170,7 +163,7 @@ void VideoDDSpublisher::initGstreamer()
 	// gst-launch-1.0 --gst-debug=*src:5 v4l2src num-buffers=1 ! fakesink
 
 	std::vector<std::string> sourceCanditates;
-	if (!m_useTestSrc)
+	if (!useTestSrc)
 	{
 		sourceCanditates.push_back("ksvideosrc");
 		sourceCanditates.push_back("v4l2src");
@@ -186,7 +179,7 @@ void VideoDDSpublisher::initGstreamer()
 
 	GstCaps *capsFilter = nullptr;
 
-	if (m_useFixedCaps)
+	if (useFixedCaps)
 	{
 		qDebug() << "Using fixed capabilities";
 		capsFilter = gst_caps_new_simple("video/x-raw",
@@ -196,7 +189,7 @@ void VideoDDSpublisher::initGstreamer()
 										 nullptr);
 	}
 	else
-	if (m_useTestSrc || sourceSelection.elementName() == "videotestsrc")
+	if (useTestSrc || sourceSelection.elementName() == "videotestsrc")
 	{
 		qDebug() << "Using fixed capabilities for test source";
 		capsFilter = gst_caps_new_simple("video/x-raw",
@@ -255,7 +248,7 @@ void VideoDDSpublisher::initGstreamer()
 	// Encoder
 
 	GstElementFactory* factory = nullptr;
-	if (m_useOmx)
+	if (useOmx)
 	{
 		factory = gst_element_factory_find("avenc_h264_omx");
 	}
@@ -385,45 +378,4 @@ void VideoDDSpublisher::initGstreamer()
 	}
 
 	widget->show();
-}
-
-void VideoDDSpublisher::init()
-{
-	initDDS("VideoStream");
-	initGstreamer();
-}
-
-bool VideoDDSpublisher::useTestSrc() const
-{
-	return m_useTestSrc;
-}
-
-void VideoDDSpublisher::setUseTestSrc(bool useTestSrc)
-{
-	m_useTestSrc = useTestSrc;
-}
-
-bool VideoDDSpublisher::useOmx() const
-{
-	return m_useOmx;
-}
-
-void VideoDDSpublisher::setUseOmx(bool useOmx)
-{
-	m_useOmx = useOmx;
-}
-
-void VideoDDSpublisher::setUseFixedCaps(bool useFixedCaps)
-{
-	m_useFixedCaps = useFixedCaps;
-}
-
-int VideoDDSpublisher::strength() const
-{
-	return m_strength;
-}
-
-void VideoDDSpublisher::setStrength(int strength)
-{
-	m_strength = strength;
 }

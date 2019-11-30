@@ -22,18 +22,65 @@
 
 #include "videowidgetpaintergst.h"
 
-VideoDDSsubscriber::VideoDDSsubscriber(int& argc, char** argv) :
-	QApplication(argc, argv)
-	,m_videoListener(nullptr)
-	,m_dr(dds::core::null)
-	,m_useOmx(false)
+VideoDDSsubscriber::VideoDDSsubscriber(VideoListener* videoListener, bool useOmx)
+	: m_dataReader(dds::core::null)
 {
-	setApplicationName("Video DDS Subscriber");
-}
+	const std::string topicName = "VideoStream";
 
-void VideoDDSsubscriber::init()
-{
-	initDDS("VideoStream");
+	try
+	{
+		// Create a domain participant using the default ID configured on the XML file
+		dds::domain::DomainParticipant dp(org::opensplice::domain::default_id());
+
+		// Create a topic QoS with exclusive ownership. The exclusive ownership allows
+		// the use of the ownership strength to define which video source is used.
+		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
+//				<< dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(1000));
+		// Following settings might be interesting for other usecases:
+		//	<< dds::core::policy::Durability::Transient()
+		//	<< dds::core::policy::Reliability::BestEffort();
+
+		// Create a topic
+		dds::topic::Topic<S2E::Video> topic(dp, topicName, topicQos);
+
+		// Create a subscriber with a default QoS
+		dds::sub::qos::SubscriberQos subQos = dp.default_subscriber_qos();
+		dds::sub::Subscriber sub(dp, subQos);
+
+		dds::sub::qos::DataReaderQos drqos = topic.qos();
+		drqos	<< dds::core::policy::Ownership::Exclusive()
+				<< dds::core::policy::Liveliness::Automatic()
+				<< dds::core::policy::History(dds::core::policy::HistoryKind::KEEP_LAST, 20);
+
+		// Trigger the callback functions when data becomes available or when the
+		// requested deadline is missed (currently not used)
+		dds::core::status::StatusMask mask;
+		mask << dds::core::status::StatusMask::data_available()
+			 << dds::core::status::StatusMask::requested_deadline_missed();
+
+		// Create the data reader for the video topic
+		m_dataReader = dds::sub::DataReader<S2E::Video>(sub, topic, drqos, videoListener, mask);
+	}
+	catch(const dds::core::OutOfResourcesError& e)
+	{
+		qCritical("DDS OutOfResourcesError: %s", e.what());
+	}
+	catch(const dds::core::InvalidArgumentError& e)
+	{
+		qCritical("DDS InvalidArgumentError: %s", e.what());
+	}
+	catch(const dds::core::NullReferenceError& e)
+	{
+		qCritical("DDS NullReferenceError: %s", e.what());
+	}
+	catch(const dds::core::Error& e)
+	{
+		qCritical("DDS Error: %s", e.what());
+	}
+	catch(...)
+	{
+		qCritical("DDS initialization failed with unhandled exeption");
+	}
 
 	auto widget = new VideoWidgetPainterGst();
 
@@ -63,7 +110,7 @@ void VideoDDSsubscriber::init()
 	gst_bin_add(GST_BIN_CAST(pipeline), appSrc);
 
 	GstElement* decoder = nullptr;
-	if (m_useOmx == true)
+	if (useOmx == true)
 	{
 		decoder = gst_element_factory_make("omxh264dec", nullptr);
 	}
@@ -95,9 +142,9 @@ void VideoDDSsubscriber::init()
 
 	widget->installAppSink(GST_APP_SINK_CAST(appSink));
 
-	if (m_videoListener != nullptr)
+	if (videoListener != nullptr)
 	{
-		m_videoListener->installAppSrc(GST_APP_SRC_CAST(appSrc));
+		videoListener->installAppSrc(GST_APP_SRC_CAST(appSrc));
 	}
 
 
@@ -109,77 +156,5 @@ void VideoDDSsubscriber::init()
 		qWarning() << "Set pipeline to playing failed";
 		gst_bus_set_flushing(bus, true);
 	}
-}
-
-void VideoDDSsubscriber::initDDS(const QString& topicName)
-{
-	try
-	{
-		// Create a domain participant using the default ID configured on the XML file
-		dds::domain::DomainParticipant dp(org::opensplice::domain::default_id());
-
-		// Create a topic QoS with exclusive ownership. The exclusive ownership allows
-		// the use of the ownership strength to define which video source is used.
-		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
-//				<< dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(1000));
-		// Following settings might be interesting for other usecases:
-		//	<< dds::core::policy::Durability::Transient()
-		//	<< dds::core::policy::Reliability::BestEffort();
-
-		// Create a topic
-		dds::topic::Topic<S2E::Video> topic(dp, topicName.toStdString(), topicQos);
-
-		// Create a subscriber with a default QoS
-		dds::sub::qos::SubscriberQos subQos = dp.default_subscriber_qos();
-		dds::sub::Subscriber sub(dp, subQos);
-
-		dds::sub::qos::DataReaderQos drqos = topic.qos();
-		drqos	<< dds::core::policy::Ownership::Exclusive()
-				<< dds::core::policy::Liveliness::Automatic()
-				<< dds::core::policy::History(dds::core::policy::HistoryKind::KEEP_LAST, 20);
-
-		// Trigger the callback functions when data becomes available or when the
-		// requested deadline is missed (currently not used)
-		dds::core::status::StatusMask mask;
-		mask << dds::core::status::StatusMask::data_available()
-			 << dds::core::status::StatusMask::requested_deadline_missed();
-
-		// Create a video listener which triggers the callbacks necessary for showing
-		// the video data when a new message is received
-		m_videoListener = new VideoListener();
-
-		// Create the data reader for the video topic
-		m_dr = dds::sub::DataReader<S2E::Video>(sub, topic, drqos, m_videoListener, mask);
-	}
-	catch(dds::core::Error e)
-	{
-		qCritical("DDS Error: %s", e.what());
-	}
-	catch(dds::core::OutOfResourcesError e)
-	{
-		qCritical("DDS OutOfResourcesError: %s", e.what());
-	}
-	catch(dds::core::InvalidArgumentError e)
-	{
-		qCritical("DDS InvalidArgumentError: %s", e.what());
-	}
-	catch(dds::core::NullReferenceError e)
-	{
-		qCritical("DDS NullReferenceError: %s", e.what());
-	}
-	catch(...)
-	{
-		qCritical("DDS initialization failed with unhandled exeption");
-	}
-}
-
-bool VideoDDSsubscriber::useOmx() const
-{
-	return m_useOmx;
-}
-
-void VideoDDSsubscriber::setUseOmx(bool useOmx)
-{
-	m_useOmx = useOmx;
 }
 
