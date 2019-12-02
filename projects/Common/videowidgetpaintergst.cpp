@@ -1,15 +1,15 @@
-// Copyright 2017 S2E Software, Systems and Control 
-//  
-// Licensed under the Apache License, Version 2.0 the "License"; 
-// you may not use this file except in compliance with the License. 
-// You may obtain a copy of the License at 
-//  
-//    http://www.apache.org/licenses/LICENSE-2.0 
-//  
-// Unless required by applicable law or agreed to in writing, software 
-// distributed under the License is distributed on an "AS IS" BASIS, 
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-// See the License for the specific language governing permissions and 
+// Copyright 2017 S2E Software, Systems and Control
+//
+// Licensed under the Apache License, Version 2.0 the "License";
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
 // limitations under the License.
 
 #include "videowidgetpaintergst.h"
@@ -17,13 +17,8 @@
 #include <QDebug>
 #include <QPainter>
 
-VideoWidgetPainterGst::VideoWidgetPainterGst() :
-    m_appSink(nullptr)
-{
-
-}
-
-void VideoWidgetPainterGst::installAppSink(GstAppSink* appSink)
+VideoWidgetPainterGst::VideoWidgetPainterGst(GstAppSink* appSink) :
+	m_appSink(appSink)
 {
 	if (appSink == nullptr)
 	{
@@ -31,35 +26,32 @@ void VideoWidgetPainterGst::installAppSink(GstAppSink* appSink)
 		return;
 	}
 
-	m_appSink = appSink;
+	// enable OnSampleArrived
+	g_object_set(appSink,
+				 "emit-signals", true,
+				nullptr);
 
-    // enable OnSampleArrived
-    g_object_set(appSink,
-                 "emit-signals", TRUE,
-                NULL);
-
-    g_signal_connect(appSink,
-                "new-sample",
-                G_CALLBACK(VideoWidgetPainterGst::onSampleArrived), this);
-
+	g_signal_connect(appSink,
+				"new-sample",
+				G_CALLBACK(VideoWidgetPainterGst::onSampleArrived), this);
 }
 
 void VideoWidgetPainterGst::paintEvent(QPaintEvent* /*event*/)
 {
-     pullFromAppSinkAndPaint(m_appSink);
+	 pullFromAppSinkAndPaint(m_appSink);
 }
 
 void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 {
-    GstSample* sample = nullptr;
-    GstBuffer* sampleBuffer = nullptr;
+	GstSample* sample = nullptr;
+	GstBuffer* sampleBuffer = nullptr;
 	GstMapInfo mapInfo;
-    GstCaps* caps = nullptr;
-    GstStructure* capsStruct = nullptr;
+	GstCaps* caps = nullptr;
+	GstStructure* capsStruct = nullptr;
 	bool ret;
-    int arrivedWidth = 0;
-    int arrivedHeight = 0;
-    QImage::Format externalFormat = QImage::Format_RGB888;
+	int arrivedWidth = 0;
+	int arrivedHeight = 0;
+	QImage::Format externalFormat = QImage::Format_RGB888;
 
 	if(appSink == nullptr)
 	{
@@ -73,26 +65,26 @@ void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 	// Pull a sample from the GStreamer pipeline
 	const GstClockTime timeOutNanoSeconds = 10000;
 	sample = gst_app_sink_try_pull_sample(appSink, timeOutNanoSeconds);
-    if(sample == nullptr)
+	if(sample == nullptr)
 	{
 		return;
 	}
 
 	caps = gst_sample_get_caps(sample);
 	capsStruct = gst_caps_get_structure(caps, 0 /*index*/);
-    if (capsStruct == nullptr)
+	if (capsStruct == nullptr)
 	{
 		qWarning("Failed getting structure from caps.");
 		return;
 	}
 
-    ret = gst_structure_get_int(capsStruct, "width", &arrivedWidth);
+	ret = gst_structure_get_int(capsStruct, "width", &arrivedWidth);
 	if (ret == false)
 	{
 		qWarning("Failed getting width from structure.");
 		return;
 	}
-    ret = gst_structure_get_int(capsStruct, "height", &arrivedHeight);
+	ret = gst_structure_get_int(capsStruct, "height", &arrivedHeight);
 	if (ret == false)
 	{
 		qWarning("Failed getting height from structure.");
@@ -105,11 +97,11 @@ void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 
 	if (format == "RGB")
 	{
-        externalFormat = QImage::Format_RGB888;
+		externalFormat = QImage::Format_RGB888;
 	}
 	else if (format == "RGBA")
 	{
-        externalFormat = QImage::Format_RGBA8888;
+		externalFormat = QImage::Format_RGBA8888;
 	}
 	else
 	{
@@ -118,24 +110,24 @@ void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 	}
 
 	sampleBuffer = gst_sample_get_buffer(sample);
-    if(sampleBuffer != nullptr)
+	if(sampleBuffer != nullptr)
 	{
 		gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
 
 
-        QPainter p{this};
+		QPainter p{this};
 
-        auto data{const_cast<uchar const* const>(mapInfo.data)};
-        /*const auto bytesPerLine{int(image.step)};*/
-        const QImage qimage{data, arrivedWidth, arrivedHeight/*, bytesPerLine*/, externalFormat};
+		auto data{const_cast<uchar const* const>(mapInfo.data)};
+		/*const auto bytesPerLine{int(image.step)};*/
+		const QImage qimage{data, arrivedWidth, arrivedHeight/*, bytesPerLine*/, externalFormat};
 
-        const QSize imageSize{arrivedWidth, arrivedHeight};
-        QRect vpRect{QPoint{0, 0}, imageSize.scaled(width(), height(), Qt::KeepAspectRatio)};
-        vpRect.moveCenter(rect().center());
+		const QSize imageSize{arrivedWidth, arrivedHeight};
+		QRect vpRect{QPoint{0, 0}, imageSize.scaled(width(), height(), Qt::KeepAspectRatio)};
+		vpRect.moveCenter(rect().center());
 
-        p.drawImage(vpRect, qimage);
+		p.drawImage(vpRect, qimage);
 
-        gst_buffer_unmap(sampleBuffer, &mapInfo);
+		gst_buffer_unmap(sampleBuffer, &mapInfo);
 
 	}
 	gst_sample_unref(sample);
@@ -149,7 +141,7 @@ GstFlowReturn VideoWidgetPainterGst::onSampleArrived(GstAppSink* appSink, gpoint
 {
 	Q_UNUSED(appSink)
 	// Connot use 'this' directly since it must be a static function
-    auto self = static_cast<VideoWidgetPainterGst*>(userData);
+	auto self = static_cast<VideoWidgetPainterGst*>(userData);
 
 	// Use invoke method and do not call it directly since the
 	// update function must be called in the GUI thread

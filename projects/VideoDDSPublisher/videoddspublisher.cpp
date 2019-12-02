@@ -83,77 +83,10 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 }
 
 
-VideoDDSpublisher::VideoDDSpublisher(bool useTestSrc, bool useOmx, bool useFixedCaps, int strength)
-	: m_dataWriter(dds::core::null)
+VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWriter, bool useTestSrc, bool useOmx, bool useFixedCaps)
+	: m_dataWriter(dataWriter)
+	, m_appSink(nullptr)
 {
-
-	const std::string topicName = "VideoStream";
-	// OpenDplice uses an error throwing mechanism, some of the possible
-	// error types that may be thrown from the used function are
-	// catched below
-	try
-	{
-		// Create a domain participant using the default ID configured on the XML file
-		dds::domain::DomainParticipant dp(org::opensplice::domain::default_id());
-
-		// Create a topic QoS with exclusive ownership and defined liveliness.
-		// The exclusive ownership allows the use of the ownership strength to define which video source is used.
-		// The liveliness topic determines how to long to wait until the source with lower strength is used
-		// when messages are not received from the source with higher ownership strength.
-		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
-		//	The dds::core::policy::Liveliness qos setting had been previously added here and is now
-		// (probably) at the data writer QoS. This was done to prevent a crash that was caused
-		// by having the dataReader without the Liveliness setting
-		// Further option may be:
-		//	<< dds::core::policy::Durability::Volatile()
-		//	<< dds::core::policy::Reliability::BestEffort();
-
-		dds::topic::Topic<S2E::Video> topic(dp, topicName, topicQos);
-
-		dds::pub::qos::PublisherQos pubQos = dp.default_publisher_qos();
-		dds::pub::Publisher pub(dp, pubQos);
-
-		dds::pub::qos::DataWriterQos dwqos = topic.qos();
-		dwqos << dds::core::policy::OwnershipStrength(strength);
-		dwqos << dds::core::policy::WriterDataLifecycle::AutoDisposeUnregisteredInstances();
-		dwqos << dds::core::policy::Ownership::Exclusive();
-		dwqos << dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(1000));
-
-		m_dataWriter = dds::pub::DataWriter<S2E::Video>(pub, topic, dwqos);
-	}
-	catch (const dds::core::OutOfResourcesError& e)
-	{
-		qFatal("DDS OutOfResourcesError: %s", e.what());
-	}
-	catch (const dds::core::InvalidArgumentError& e)
-	{
-		qFatal("DDS InvalidArgumentError: %s", e.what());
-	}
-	catch (const dds::core::NullReferenceError& e)
-	{
-		qFatal("DDS NullReferenceError: %s", e.what());
-	}
-	catch (const dds::core::Error& e)
-	{
-		qFatal("DDS Error: %s", e.what());
-	}
-	catch (...)
-	{
-		qFatal("DDS initialization failed with unhandled exeption");
-	}
-
-
-
-	///////////
-	// Gtreamer
-
-	auto widget = new VideoWidgetPainterGst();
-
-	// The message handler must be installed before GStreamer
-	// is initialized.
-	QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
-	QtGStreamer::instance()->init();
-
 	//////////////
 	// Source
 
@@ -228,7 +161,7 @@ VideoDDSpublisher::VideoDDSpublisher(bool useTestSrc, bool useOmx, bool useFixed
 
 	auto encodereBin = GST_BIN_CAST(gst_bin_new("encodereBin"));
 
-	auto ddsAppSink = gst_element_factory_make("appsink", nullptr);
+	auto ddsAppSink  = gst_element_factory_make("appsink", nullptr);
 	gst_bin_add(encodereBin, ddsAppSink);
 	auto ddsSinkCaps = gst_caps_new_simple("video/x-h264",
 		"stream-format", G_TYPE_STRING, "byte-stream",
@@ -318,21 +251,21 @@ VideoDDSpublisher::VideoDDSpublisher(bool useTestSrc, bool useOmx, bool useFixed
 
 	auto displayBin = GST_BIN_CAST(gst_bin_new("displayBin"));
 	auto displayConverter = gst_element_factory_make("videoconvert", nullptr);
-	auto displayAppSink = gst_element_factory_make("appsink", nullptr);
+	m_appSink = gst_element_factory_make("appsink", nullptr);
 	gst_bin_add(displayBin, displayConverter);
-	gst_bin_add(displayBin, displayAppSink);
+	gst_bin_add(displayBin, m_appSink);
 	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
 		"format", G_TYPE_STRING, "RGBA",
 		nullptr
 	);
-	g_object_set(displayAppSink,
+	g_object_set(m_appSink,
 		"caps", displaySinkCaps,
 		"max-buffers", 1,
 		"drop", true,
 		"sync", false,
 		nullptr
 	);
-	gst_element_link(displayConverter, displayAppSink);
+	gst_element_link(displayConverter, m_appSink);
 
 	auto padFirstDisplay = gst_element_get_static_pad(displayConverter, "sink");
 	gst_element_add_pad(GST_ELEMENT_CAST(displayBin), gst_ghost_pad_new("sink", padFirstDisplay));
@@ -368,8 +301,6 @@ VideoDDSpublisher::VideoDDSpublisher(bool useTestSrc, bool useOmx, bool useFixed
 		qWarning() << "Linking pipeline failed!";
 	}
 
-	widget->installAppSink(GST_APP_SINK_CAST(displayAppSink));
-
 	auto pipelineStartSucess = gst_element_set_state(pipeline, GST_STATE_PLAYING);
 	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
 	{
@@ -377,5 +308,10 @@ VideoDDSpublisher::VideoDDSpublisher(bool useTestSrc, bool useOmx, bool useFixed
 		gst_bus_set_flushing(bus, true);
 	}
 
-	widget->show();
+}
+
+
+GstAppSink* VideoDDSpublisher::appsink()
+{
+	return GST_APP_SINK_CAST(m_appSink);
 }

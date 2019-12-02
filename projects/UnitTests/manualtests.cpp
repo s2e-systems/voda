@@ -389,8 +389,7 @@ TEST(PainterWidgetTest, DISABLED_TestSourceAppsink)
 	auto caps = gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, "RGB", "width", G_TYPE_INT, 640, "height", G_TYPE_INT, 480, "framerate", GST_TYPE_FRACTION, 10, 1, nullptr);
 	g_object_set(sink, "caps", caps, NULL);
 
-	VideoWidgetPainterGst widget;
-	widget.installAppSink(GST_APP_SINK_CAST(sink));
+	VideoWidgetPainterGst widget(GST_APP_SINK_CAST(sink));
 	widget.show();
 
 	gst_bin_add_many(GST_BIN(pipeline), source, sink, nullptr);

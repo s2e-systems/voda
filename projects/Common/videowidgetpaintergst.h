@@ -1,15 +1,15 @@
-// Copyright 2017 S2E Software, Systems and Control 
-//  
-// Licensed under the Apache License, Version 2.0 the "License"; 
-// you may not use this file except in compliance with the License. 
-// You may obtain a copy of the License at 
-//  
-//    http://www.apache.org/licenses/LICENSE-2.0 
-//  
-// Unless required by applicable law or agreed to in writing, software 
-// distributed under the License is distributed on an "AS IS" BASIS, 
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-// See the License for the specific language governing permissions and 
+// Copyright 2017 S2E Software, Systems and Control
+//
+// Licensed under the Apache License, Version 2.0 the "License";
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
 // limitations under the License.
 
 #ifndef VideoWidgetPainterGst_H
@@ -24,21 +24,12 @@ class VideoWidgetPainterGst : public QWidget
 public:
 
 	/**
-	 * Does nothing.
 	 */
-    VideoWidgetPainterGst();
-
-	/**
-	 * Set the appsink from which pintGL() pulls the video buffers from.
-	 * If enableOnSampleArrived is true:
-	 * enable emitting of signals of the appsink and connect the onSampleArrived()
-	 * callback function.
-	 */
-    void installAppSink(GstAppSink* appSink);
+	VideoWidgetPainterGst(GstAppSink* appSink);
 
 private:
 
-    void paintEvent(QPaintEvent* /*event*/) override;
+	void paintEvent(QPaintEvent* /*event*/) override;
 	/**
 	 * Pulls a GStreamer buffer from the appsink and transferes it to the
 	 * GPU using glTexImage2D(GL_TEXTURE_2D, ...).
@@ -49,7 +40,7 @@ private:
 	 *
 	 * If no appsink is installed, this function siliently returns.
 	 */
-    void pullFromAppSinkAndPaint(GstAppSink* appSink);
+	void pullFromAppSinkAndPaint(GstAppSink* appSink);
 
 	/**
 	 * Only invokes an update().
@@ -60,7 +51,7 @@ private:
 	 */
 	static GstFlowReturn onSampleArrived(GstAppSink* appSink, gpointer userData);
 
-    GstAppSink* m_appSink;
+	GstAppSink* m_appSink;
 };
 
 #endif

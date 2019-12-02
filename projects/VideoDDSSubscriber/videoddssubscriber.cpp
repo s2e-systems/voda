@@ -22,71 +22,8 @@
 
 #include "videowidgetpaintergst.h"
 
-VideoDDSsubscriber::VideoDDSsubscriber(VideoListener* videoListener, bool useOmx)
-	: m_dataReader(dds::core::null)
+VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 {
-	const std::string topicName = "VideoStream";
-
-	try
-	{
-		// Create a domain participant using the default ID configured on the XML file
-		dds::domain::DomainParticipant dp(org::opensplice::domain::default_id());
-
-		// Create a topic QoS with exclusive ownership. The exclusive ownership allows
-		// the use of the ownership strength to define which video source is used.
-		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
-//				<< dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(1000));
-		// Following settings might be interesting for other usecases:
-		//	<< dds::core::policy::Durability::Transient()
-		//	<< dds::core::policy::Reliability::BestEffort();
-
-		// Create a topic
-		dds::topic::Topic<S2E::Video> topic(dp, topicName, topicQos);
-
-		// Create a subscriber with a default QoS
-		dds::sub::qos::SubscriberQos subQos = dp.default_subscriber_qos();
-		dds::sub::Subscriber sub(dp, subQos);
-
-		dds::sub::qos::DataReaderQos drqos = topic.qos();
-		drqos	<< dds::core::policy::Ownership::Exclusive()
-				<< dds::core::policy::Liveliness::Automatic()
-				<< dds::core::policy::History(dds::core::policy::HistoryKind::KEEP_LAST, 20);
-
-		// Trigger the callback functions when data becomes available or when the
-		// requested deadline is missed (currently not used)
-		dds::core::status::StatusMask mask;
-		mask << dds::core::status::StatusMask::data_available()
-			 << dds::core::status::StatusMask::requested_deadline_missed();
-
-		// Create the data reader for the video topic
-		m_dataReader = dds::sub::DataReader<S2E::Video>(sub, topic, drqos, videoListener, mask);
-	}
-	catch(const dds::core::OutOfResourcesError& e)
-	{
-		qCritical("DDS OutOfResourcesError: %s", e.what());
-	}
-	catch(const dds::core::InvalidArgumentError& e)
-	{
-		qCritical("DDS InvalidArgumentError: %s", e.what());
-	}
-	catch(const dds::core::NullReferenceError& e)
-	{
-		qCritical("DDS NullReferenceError: %s", e.what());
-	}
-	catch(const dds::core::Error& e)
-	{
-		qCritical("DDS Error: %s", e.what());
-	}
-	catch(...)
-	{
-		qCritical("DDS initialization failed with unhandled exeption");
-	}
-
-	auto widget = new VideoWidgetPainterGst();
-
-	// Message handler must be installed before GStreamer init()
-	QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
-	QtGStreamer::instance()->init();
 
 	auto pipeline = gst_pipeline_new("subscriber");
 	auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
@@ -99,15 +36,15 @@ VideoDDSsubscriber::VideoDDSsubscriber(VideoListener* videoListener, bool useOmx
 		nullptr
 	);
 
-	auto appSrc = gst_element_factory_make("appsrc", nullptr);
-	g_object_set(appSrc,
+	m_ddsAppSrc = gst_element_factory_make("appsrc", nullptr);
+	g_object_set(m_ddsAppSrc,
 		"caps", srcCaps,
 		"is-live", true,
 		"format", GST_FORMAT_TIME,
 		nullptr
 	);
 
-	gst_bin_add(GST_BIN_CAST(pipeline), appSrc);
+	gst_bin_add(GST_BIN_CAST(pipeline), m_ddsAppSrc);
 
 	GstElement* decoder = nullptr;
 	if (useOmx == true)
@@ -120,17 +57,17 @@ VideoDDSsubscriber::VideoDDSsubscriber(VideoListener* videoListener, bool useOmx
 	}
 
 	gst_bin_add(GST_BIN_CAST(pipeline), decoder);
-	gst_element_link(appSrc, decoder);
+	gst_element_link(m_ddsAppSrc, decoder);
 
 	auto converter = gst_element_factory_make("videoconvert", nullptr);
-	auto appSink = gst_element_factory_make("appsink", nullptr);
+	m_displayAppSink = gst_element_factory_make("appsink", nullptr);
 	gst_bin_add(GST_BIN_CAST(pipeline), converter);
-	gst_bin_add(GST_BIN_CAST(pipeline), appSink);
+	gst_bin_add(GST_BIN_CAST(pipeline), m_displayAppSink);
 	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
 		"format", G_TYPE_STRING, "RGBA",
 		nullptr
 	);
-	g_object_set(appSink,
+	g_object_set(m_displayAppSink,
 		"caps", displaySinkCaps,
 		"max-buffers", 1,
 		"drop", true,
@@ -138,17 +75,8 @@ VideoDDSsubscriber::VideoDDSsubscriber(VideoListener* videoListener, bool useOmx
 		nullptr
 	);
 	gst_element_link(decoder, converter);
-	gst_element_link(converter, appSink);
+	gst_element_link(converter, m_displayAppSink);
 
-	widget->installAppSink(GST_APP_SINK_CAST(appSink));
-
-	if (videoListener != nullptr)
-	{
-		videoListener->installAppSrc(GST_APP_SRC_CAST(appSrc));
-	}
-
-
-	widget->show();
 
 	auto pipelineStartSucess = gst_element_set_state(pipeline, GST_STATE_PLAYING);
 	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
@@ -158,3 +86,11 @@ VideoDDSsubscriber::VideoDDSsubscriber(VideoListener* videoListener, bool useOmx
 	}
 }
 
+GstAppSink* VideoDDSsubscriber::displayAppSink()
+{
+	return GST_APP_SINK_CAST(m_displayAppSink);
+}
+GstAppSrc* VideoDDSsubscriber::ddsAppSrc()
+{
+	return GST_APP_SRC_CAST(m_ddsAppSrc);
+}

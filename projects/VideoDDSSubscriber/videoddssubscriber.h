@@ -15,13 +15,8 @@
 #ifndef VIDEODDSSUBSCRIBER_H
 #define VIDEODDSSUBSCRIBER_H
 
-#include <QApplication>
-
-
-#include "VideoDDS_DCPS.hpp"
-
-//forward declarations
-class VideoListener;
+#include <gst/app/gstappsink.h>
+#include <gst/app/gstappsrc.h>
 
 /**
  */
@@ -32,10 +27,14 @@ public:
 
 	/**
 	 */
-	VideoDDSsubscriber(VideoListener* videoListener, bool useOmx);
+	VideoDDSsubscriber(bool useOmx);
+	GstAppSink* displayAppSink();
+	GstAppSrc* ddsAppSrc();
 
 private:
-	dds::sub::DataReader<S2E::Video> m_dataReader;
+
+	GstElement* m_displayAppSink;
+	GstElement* m_ddsAppSrc;
 };
 
 #endif

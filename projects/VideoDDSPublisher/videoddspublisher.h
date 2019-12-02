@@ -16,6 +16,9 @@
 #define VIDEODDSPUBLISHER_H
 
 #include "VideoDDS_DCPS.hpp"
+#include <gst/gstelement.h>
+#include <gst/app/gstappsink.h>
+
 
 /**
  */
@@ -23,13 +26,13 @@ class VideoDDSpublisher
 {
 public:
 
-	VideoDDSpublisher(bool useTestSrc, bool useOmx, bool useFixedCaps, int strength);
+	VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWriter, bool useTestSrc, bool useOmx, bool useFixedCaps);
+	GstAppSink* appsink();
 
 private:
-
-	/** Data writer: must be initialized since the construtor is private */
 	dds::pub::DataWriter<S2E::Video> m_dataWriter;
-
+	GstElement* m_appSink;
 };
+
 
 #endif
