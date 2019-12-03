@@ -40,13 +40,8 @@ int main(int argc, char *argv[])
 	parser.addOption(strengthOption);
 	parser.process(application);
 
-	//////////
-	// DDS
-
 	const std::string topicName = "VideoStream";
-	// OpenDplice uses an error throwing mechanism, some of the possible
-	// error types that may be thrown from the used function are
-	// catched below
+
 	try
 	{
 		// Create a domain participant using the default ID configured on the XML file
@@ -81,10 +76,11 @@ int main(int argc, char *argv[])
 		// is initialized.
 		QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
 		QtGStreamer::instance()->init();
+
 		VideoDDSpublisher publisher{dataWriter, parser.isSet(useTestSrcOption), parser.isSet(useOmxOption), parser.isSet(useFixedCapsOption)};
 
-		auto widget = new VideoWidgetPainterGst(publisher.appsink());
-		widget->show();
+		VideoWidgetPainterGst widget(publisher.appsink());
+		widget.show();
 
 		return application.exec();
 	}

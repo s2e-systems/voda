@@ -25,23 +25,12 @@
 
 static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userData)
 {
-	Q_UNUSED(appSink)
-	bool dataWriterValid = false;
 	auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video>* >(userData);
-	if (dataWriter == nullptr)
+	if (dataWriter == nullptr || dataWriter->is_nil())
 	{
-		dataWriterValid = false;
+		qCritical() << "Data writer for dds app sink not valid";
+		return GST_FLOW_ERROR;
 	}
-	if (dataWriter->is_nil() == true)
-	{
-		qWarning() << "Data writer in Pipeline not valid";
-		dataWriterValid = false;
-	}
-	else
-	{
-		dataWriterValid = true;
-	}
-	//dataWriter->assert_liveliness();
 
 	const int userid = 0;
 	// Count the samples that have arrived. Used also to define the
@@ -49,20 +38,17 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 	static int frameNum = 0;
 	frameNum++;
 
-	GstSample* sample = NULL;
-	GstBuffer* sampleBuffer = NULL;
-	GstMapInfo mapInfo;
-
 	// Pull a sample from the GStreamer pipeline
-	sample = gst_app_sink_pull_sample(appSink);
-	if(sample != NULL)
+	auto sample = gst_app_sink_pull_sample(appSink);
+	if(sample != nullptr)
 	{
-		sampleBuffer = gst_sample_get_buffer(sample);
-		if(sampleBuffer != NULL && dataWriterValid == true)
+		auto sampleBuffer = gst_sample_get_buffer(sample);
+		if(sampleBuffer != nullptr)
 		{
+			GstMapInfo mapInfo;
 			gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
 
-			const int byteCount = mapInfo.size;
+			const auto byteCount = int(mapInfo.size);
 			auto rawData = static_cast<uint8_t* >(mapInfo.data);
 			const std::vector<uint8_t> frame(rawData, rawData + byteCount);
 			const S2E::Video sample(userid, frameNum, frame);
@@ -82,10 +68,25 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 	return GST_FLOW_OK;
 }
 
+VideoDDSpublisher::~VideoDDSpublisher()
+{
+	auto bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
+	auto pipelineStartSucess = gst_element_set_state(m_pipeline, GST_STATE_NULL);
+	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
+	{
+		qWarning() << "Set pipeline to null failed";
+		gst_bus_set_flushing(bus, true);
+	}
+	// Switch off emitting of signals by the dds appsink. This
+	// is to prevent calling of the callback function and using
+	// dds resources after destruction of this class (in case the
+	// above setting of the pipeline to null did fail)
+	auto ddsAppSink = gst_bin_get_by_name(GST_BIN_CAST(m_pipeline), "ddsAppSink");
+	g_object_set(ddsAppSink, "emit-signals", false, nullptr);
+}
 
 VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWriter, bool useTestSrc, bool useOmx, bool useFixedCaps)
 	: m_dataWriter(dataWriter)
-	, m_appSink(nullptr)
 {
 	//////////////
 	// Source
@@ -161,7 +162,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 
 	auto encodereBin = GST_BIN_CAST(gst_bin_new("encodereBin"));
 
-	auto ddsAppSink  = gst_element_factory_make("appsink", nullptr);
+	auto ddsAppSink  = gst_element_factory_make("appsink", "ddsAppSink");
 	gst_bin_add(encodereBin, ddsAppSink);
 	auto ddsSinkCaps = gst_caps_new_simple("video/x-h264",
 		"stream-format", G_TYPE_STRING, "byte-stream",
@@ -251,21 +252,21 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 
 	auto displayBin = GST_BIN_CAST(gst_bin_new("displayBin"));
 	auto displayConverter = gst_element_factory_make("videoconvert", nullptr);
-	m_appSink = gst_element_factory_make("appsink", nullptr);
+	auto appSink = gst_element_factory_make("appsink", "displayAppSink");
 	gst_bin_add(displayBin, displayConverter);
-	gst_bin_add(displayBin, m_appSink);
+	gst_bin_add(displayBin, appSink);
 	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
 		"format", G_TYPE_STRING, "RGBA",
 		nullptr
 	);
-	g_object_set(m_appSink,
+	g_object_set(appSink,
 		"caps", displaySinkCaps,
 		"max-buffers", 1,
 		"drop", true,
 		"sync", false,
 		nullptr
 	);
-	gst_element_link(displayConverter, m_appSink);
+	gst_element_link(displayConverter, appSink);
 
 	auto padFirstDisplay = gst_element_get_static_pad(displayConverter, "sink");
 	gst_element_add_pad(GST_ELEMENT_CAST(displayBin), gst_ghost_pad_new("sink", padFirstDisplay));
@@ -274,8 +275,8 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	///////////
 	// Create pipeline and bring the bins together
 
-	auto pipeline = gst_pipeline_new("publisher");
-	auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+	m_pipeline = gst_pipeline_new("publisher");
+	auto bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
 	gst_bus_set_sync_handler(bus, Pipeline::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
 	gst_object_unref(bus);
 
@@ -283,12 +284,12 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	auto queue0 = gst_element_factory_make("queue", nullptr);
 	auto queue1 = gst_element_factory_make("queue", nullptr);
 
-	gst_bin_add(GST_BIN_CAST(pipeline), GST_ELEMENT_CAST(sourceBin));
-	gst_bin_add(GST_BIN_CAST(pipeline), tee);
-	gst_bin_add(GST_BIN_CAST(pipeline), queue0);
-	gst_bin_add(GST_BIN_CAST(pipeline), queue1);
-	gst_bin_add(GST_BIN_CAST(pipeline), GST_ELEMENT_CAST(encodereBin));
-	gst_bin_add(GST_BIN_CAST(pipeline), GST_ELEMENT_CAST(displayBin));
+	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(sourceBin));
+	gst_bin_add(GST_BIN_CAST(m_pipeline), tee);
+	gst_bin_add(GST_BIN_CAST(m_pipeline), queue0);
+	gst_bin_add(GST_BIN_CAST(m_pipeline), queue1);
+	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(encodereBin));
+	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(displayBin));
 
 	auto boolret = gst_element_link(GST_ELEMENT_CAST(sourceBin), tee);
 	boolret &= gst_element_link(queue0, GST_ELEMENT_CAST(encodereBin));
@@ -296,22 +297,21 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	boolret &= gst_element_link_pads(tee, "src_0", queue0, "sink");
 	boolret &= gst_element_link_pads(tee, "src_1", queue1, "sink");
 
-	if (boolret != true)
+	if (boolret != gboolean(true))
 	{
 		qWarning() << "Linking pipeline failed!";
 	}
 
-	auto pipelineStartSucess = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	auto pipelineStartSucess = gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
 	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
 	{
 		qWarning() << "Set pipeline to playing failed";
 		gst_bus_set_flushing(bus, true);
 	}
-
 }
 
 
 GstAppSink* VideoDDSpublisher::appsink()
 {
-	return GST_APP_SINK_CAST(m_appSink);
+	return GST_APP_SINK_CAST(gst_bin_get_by_name(GST_BIN_CAST(m_pipeline), "displayAppSink"));
 }

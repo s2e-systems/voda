@@ -27,11 +27,12 @@ class VideoDDSpublisher
 public:
 
 	VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWriter, bool useTestSrc, bool useOmx, bool useFixedCaps);
+	~VideoDDSpublisher();
 	GstAppSink* appsink();
 
 private:
 	dds::pub::DataWriter<S2E::Video> m_dataWriter;
-	GstElement* m_appSink;
+	GstElement* m_pipeline;
 };
 
 
