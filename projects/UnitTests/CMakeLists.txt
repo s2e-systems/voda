@@ -23,10 +23,13 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 set(COMMON_DIR "../Common")
 include_directories(${COMMON_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(tests_automatic automatictests.cpp)
 
 #set_source_files_properties(manualtests.cpp PROPERTIES COMPILE_FLAGS -Wold-style-cast)
+set(VODA_UNITTEST_DATA_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/data")
+configure_file("config.h.in" "config.h")
 
 add_executable(tests_manual
 	mainmanualtests.cpp

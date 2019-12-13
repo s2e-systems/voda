@@ -100,8 +100,16 @@ int main(int argc, char *argv[])
 	{
 		qFatal("DDS Error: %s", e.what());
 	}
+	catch (const std::range_error& e)
+	{
+		qFatal("range_error: %s", e.what());
+	}
+	catch (const std::runtime_error& e)
+	{
+		qFatal("runtime_error: %s", e.what());
+	}
 	catch (...)
 	{
-		qFatal("DDS initialization failed with unhandled exeption");
+		qFatal("Initialization failed with unhandled exeption");
 	}
 }

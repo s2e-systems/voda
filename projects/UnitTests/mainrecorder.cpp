@@ -13,51 +13,51 @@ int main(int argc, char **argv)
 
 	std::vector<std::string> candidates{"x264enc"};//, "openh264enc", "avenc_h264_omx", "omxh264enc", "v4l2h264enc"};
 
-	const std::string baseDirectory = "./buffersWindows";
+	const std::string baseDirectory = ".";
 	const std::string filenamePattern = "%05d.h264";
 
 	GstElementFactory* factory = nullptr;
-	auto candidate = candidates.begin();
-	for (; candidate < candidates.end(); candidate++)
+	for (const auto& candidate : candidates)
 	{
-		factory = gst_element_factory_find(candidate->c_str());
+		factory = gst_element_factory_find(candidate.c_str());
 		if (factory == nullptr)
 		{
 			continue;
 		}
 
-		const std::string baseName = *candidate;
+		const std::string baseName = candidate;
 		const std::string location = baseDirectory + '/' + baseName + filenamePattern;
 
 		// Tests if a camera source can be capsfiltered
 		auto pipeline = gst_pipeline_new("pipeline");
+		GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN_CAST(pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline.dot");
+
 		auto bus = gst_element_get_bus(pipeline);
 		auto source = gst_element_factory_make("videotestsrc", nullptr);
 		g_object_set(source, "num-buffers", 100, "horizontal-speed", 1, nullptr);
 		auto encoder = gst_element_factory_create(factory, nullptr);
 		const int bitrate = 128;
 		const int intraInt = 3;
-		if (*candidate == "x264enc")
+		if (candidate == "x264enc")
 		{
 			g_object_set(encoder, "bitrate", bitrate, "key-int-max", intraInt, "insert-vui", false, "speed-preset", 1, "aud", false, "trellis", false, nullptr);
 		}
-		if (*candidate == "openh264enc")
+		if (candidate == "openh264enc")
 		{
 			g_object_set(encoder, "bitrate", bitrate * 1000, "rate-control", 1, "gop-size", intraInt, nullptr);
 		}
-		if (*candidate == "omxh264enc")
+		if (candidate == "omxh264enc")
 		{
 			g_object_set(encoder, "target-bitrate", bitrate * 1000, "periodicty-idr", intraInt,  "interval-intraframes", intraInt, nullptr);
 		}
-		if (*candidate == "avenc_h264_omx")
+		if (candidate == "avenc_h264_omx")
 		{
 			g_object_set(encoder, "bitrate", bitrate * 1000, "gop-size", intraInt, nullptr);
 		}
-		if (*candidate == "v4l2h264enc")
+		if (candidate == "v4l2h264enc")
 		{
 			//?
 		}
-
 		auto sink = gst_element_factory_make("multifilesink", nullptr);
 		g_object_set(sink, "location", location.c_str(), nullptr);
 
