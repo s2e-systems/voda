@@ -24,7 +24,6 @@ add_executable(VideoDDSPublisher
 	${SourceDir}/main.cpp
 	${SourceDir}/videoddspublisher.cpp
 	${CommonDir}/qtgstreamer.cpp
-	${CommonDir}/pipeline.cpp
 	${CommonDir}/videowidgetpaintergst.cpp
 )
 

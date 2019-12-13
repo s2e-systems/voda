@@ -21,8 +21,8 @@ add_definitions( -DGST_USE_UNSTABLE_API)
 include(GoogleTest)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-set(COMMON_DIR "../Common")
-include_directories(${COMMON_DIR})
+set(CommonDir "../Common")
+include_directories(${CommonDir})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(tests_automatic automatictests.cpp)
@@ -34,8 +34,8 @@ configure_file("config.h.in" "config.h")
 add_executable(tests_manual
 	mainmanualtests.cpp
 	manualtests.cpp
-	${COMMON_DIR}/pipeline.cpp
-	${COMMON_DIR}/videowidgetpaintergst.cpp
+	${CommonDir}/qtgstreamer.cpp
+	${CommonDir}/videowidgetpaintergst.cpp
 )
 
 add_executable(tests_recorder

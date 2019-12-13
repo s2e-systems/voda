@@ -30,7 +30,6 @@
 #include "elements.h"
 #include "cameracapabilities.h"
 #include "qtgstreamer.h"
-#include "pipeline.h"
 
 static const auto dataDirectory = VODA_UNITTEST_DATA_DIRECTORY;
 
@@ -122,7 +121,7 @@ TEST(EncoderRecorder, ReplayData)
 
 	auto pipeline = gst_pipeline_new("pipeline");
 	auto bus = gst_element_get_bus(pipeline);
-	gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
+	gst_bus_set_sync_handler(bus, &QtGStreamer::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
 
 	auto source = gst_element_factory_make("multifilesrc", nullptr);
 
@@ -177,7 +176,7 @@ TEST(EncoderRecorder, ReplayOmxData)
 
 	auto pipeline = gst_pipeline_new("pipeline");
 	auto bus = gst_element_get_bus(pipeline);
-	gst_bus_set_sync_handler(bus, &Pipeline::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
+	gst_bus_set_sync_handler(bus, &QtGStreamer::busCallBack /*function*/, static_cast<gpointer>(this), nullptr /*notify function*/);
 
 	auto source = gst_element_factory_make("multifilesrc", nullptr);
 

@@ -25,7 +25,6 @@ add_executable(VideoDDSSubscriber
 	${SourceDir}/videoddssubscriber.cpp
 	${SourceDir}/videolistener.cpp
 	${CommonDir}/qtgstreamer.cpp
-	${CommonDir}/pipeline.cpp
 	${CommonDir}/videowidgetpaintergst.cpp
 )
 

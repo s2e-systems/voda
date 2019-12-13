@@ -21,7 +21,6 @@
 #include "videowidgetpaintergst.h"
 #include "elements.h"
 #include "cameracapabilities.h"
-#include "pipeline.h"
 
 static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userData)
 {
@@ -277,7 +276,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 
 	m_pipeline = gst_pipeline_new("publisher");
 	auto bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
-	gst_bus_set_sync_handler(bus, Pipeline::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
+	gst_bus_set_sync_handler(bus, QtGStreamer::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
 	gst_object_unref(bus);
 
 	auto tee = gst_element_factory_make("tee", nullptr);

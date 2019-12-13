@@ -18,7 +18,7 @@
 
 #include "qtgstreamer.h"
 #include "videolistener.h"
-#include "pipeline.h"
+//#include "pipeline.h"
 
 #include "videowidgetpaintergst.h"
 
@@ -27,7 +27,7 @@ VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 
 	auto pipeline = gst_pipeline_new("subscriber");
 	auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-	gst_bus_set_sync_handler(bus, Pipeline::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
+	gst_bus_set_sync_handler(bus, QtGStreamer::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
 	gst_object_unref(bus);
 
 	auto srcCaps = gst_caps_new_simple("video/x-h264",

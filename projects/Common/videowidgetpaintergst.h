@@ -24,11 +24,15 @@ class VideoWidgetPainterGst : public QWidget
 public:
 
 	/**
+	 * Checks if appSink is an intance of GstAppSink and configures it to be suitable for display.
 	 */
 	VideoWidgetPainterGst(GstAppSink* appSink);
 
 private:
 
+	/**
+	 * Takes the "last-sample" from the appSink and renders it.
+	 */
 	void paintEvent(QPaintEvent* /*event*/) override;
 
 	/**
