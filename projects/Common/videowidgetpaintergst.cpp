@@ -17,18 +17,19 @@
 #include <QDebug>
 #include <QPainter>
 
+#include <gst/video/video.h>
+
 VideoWidgetPainterGst::VideoWidgetPainterGst(GstAppSink* appSink) :
 	m_appSink(appSink)
 {
-	if (appSink == nullptr)
+	if (appSink == nullptr || !GST_IS_APP_SINK(appSink))
 	{
-		qWarning() << "Appsink not valid";
-		return;
+		throw std::range_error{"Appsink not valid"};
 	}
 
-	// enable OnSampleArrived
 	g_object_set(appSink,
 				 "emit-signals", true,
+				 "enable-last-sample", true,
 				nullptr);
 
 	g_signal_connect(appSink,
@@ -37,11 +38,6 @@ VideoWidgetPainterGst::VideoWidgetPainterGst(GstAppSink* appSink) :
 }
 
 void VideoWidgetPainterGst::paintEvent(QPaintEvent* /*event*/)
-{
-	 pullFromAppSinkAndPaint(m_appSink);
-}
-
-void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 {
 	GstSample* sample = nullptr;
 	GstBuffer* sampleBuffer = nullptr;
@@ -53,18 +49,7 @@ void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 	int arrivedHeight = 0;
 	QImage::Format externalFormat = QImage::Format_RGB888;
 
-	if(appSink == nullptr)
-	{
-		// Return silently.
-		// No warning is printed since this function may be called from a different
-		// thread than the appsink installation. To allow that behaviour, no
-		// disturbing error messages need to be printed.
-		return;
-	}
-
-	// Pull a sample from the GStreamer pipeline
-	const GstClockTime timeOutNanoSeconds = 10000;
-	sample = gst_app_sink_try_pull_sample(appSink, timeOutNanoSeconds);
+	g_object_get(m_appSink, "last-sample", &sample, nullptr);
 	if(sample == nullptr)
 	{
 		return;
@@ -91,22 +76,18 @@ void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 		return;
 	}
 
-	//TODO: Use enums for type comparisson
-	gchar const* formatg = gst_structure_get_string(capsStruct, "format");
-	QString const format(formatg);
-
-	if (format == "RGB")
+	const auto formatString = gst_structure_get_string(capsStruct, "format");
+	const auto format = gst_video_format_from_string(formatString);
+	switch (format)
 	{
-		externalFormat = QImage::Format_RGB888;
-	}
-	else if (format == "RGBA")
-	{
-		externalFormat = QImage::Format_RGBA8888;
-	}
-	else
-	{
-		qWarning() << "Format" << format << "not supported.";
-		return;
+		case GstVideoFormat::GST_VIDEO_FORMAT_RGB:
+			externalFormat = QImage::Format_RGB888;
+			break;
+		case GST_VIDEO_FORMAT_RGBA:
+			externalFormat = QImage::Format_RGBA8888;
+			break;
+		default:
+			qWarning() << "Format" << formatString << "not supported.";
 	}
 
 	sampleBuffer = gst_sample_get_buffer(sample);
@@ -131,9 +112,6 @@ void VideoWidgetPainterGst::pullFromAppSinkAndPaint(GstAppSink* appSink)
 
 	}
 	gst_sample_unref(sample);
-
-//    update();
-//    QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
 }
 
 
