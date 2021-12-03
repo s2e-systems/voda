@@ -18,6 +18,7 @@
 #include <QPainter>
 
 #include <gst/video/video.h>
+#include <stdexcept>
 
 VideoWidgetPainterGst::VideoWidgetPainterGst(GstAppSink* appSink) :
 	m_appSink(appSink)

@@ -7,12 +7,14 @@ set(SourceDir ".")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-# Instruct CMake to run moc automatically when needed
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(CMAKE_AUTOMOC ON)
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-find_package(Qt5Widgets CONFIG REQUIRED)
-
-find_package(GStreamer REQUIRED glib gobject base app video)
+find_package(GStreamer REQUIRED COMPONENTS glib gobject base app video)
 
 find_package(OpenSplice REQUIRED)
 OpenSplice_IDLCPP_GEN(${CommonDir}/VideoDDS.idl ${CMAKE_CURRENT_BINARY_DIR})
@@ -34,7 +36,7 @@ include_directories(VideoDDSSubscriber
 )
 
 target_link_libraries(VideoDDSSubscriber
-	Qt5::Widgets
-	GStreamer::gstreamer GStreamer::gobject GStreamer::glib GStreamer::base GStreamer::app GStreamer::video
-	OpenSplice::ddskernel OpenSplice::dcpsisocpp2 OpenSplice::dcpssacpp
+	PRIVATE Qt6::Widgets
+	PRIVATE GStreamer::gstreamer PRIVATE GStreamer::gobject PRIVATE GStreamer::glib PRIVATE GStreamer::base PRIVATE GStreamer::app PRIVATE GStreamer::video
+	PRIVATE OpenSplice::ddskernel PRIVATE OpenSplice::dcpsisocpp2 PRIVATE OpenSplice::dcpssacpp
 )

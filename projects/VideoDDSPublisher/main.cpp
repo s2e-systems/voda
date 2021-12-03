@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDebug>
+#include <stdexcept>
 
 #include "videoddspublisher.h"
 #include "videowidgetpaintergst.h"
