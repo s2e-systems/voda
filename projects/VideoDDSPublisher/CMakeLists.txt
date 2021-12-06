@@ -8,9 +8,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_AUTOMOC ON)
-find_package(Qt5Widgets CONFIG REQUIRED)
+find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
 
 find_package(GStreamer REQUIRED glib gobject base app video)
 
@@ -33,7 +36,7 @@ include_directories(VideoDDSPublisher
 )
 
 target_link_libraries(VideoDDSPublisher
-	Qt5::Widgets
-	GStreamer::gstreamer GStreamer::glib GStreamer::gobject GStreamer::base GStreamer::app GStreamer::video
-	OpenSplice::ddskernel OpenSplice::dcpsisocpp2 OpenSplice::dcpssacpp
+	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
+	PRIVATE GStreamer::gstreamer PRIVATE GStreamer::glib PRIVATE GStreamer::gobject PRIVATE GStreamer::base PRIVATE GStreamer::app PRIVATE GStreamer::video
+	PRIVATE OpenSplice::ddskernel PRIVATE OpenSplice::dcpsisocpp2 PRIVATE OpenSplice::dcpssacpp
 )
