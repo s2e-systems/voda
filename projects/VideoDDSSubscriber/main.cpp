@@ -80,11 +80,10 @@ int main(int argc, char *argv[])
 
 		// Create a video listener which triggers the callbacks necessary for showing
 		// the video data when a new message is received
-		auto videoListener = new VideoListener();
-		videoListener->installAppSrc(subscriber.ddsAppSrc());
+		VideoListener videoListener(subscriber.ddsAppSrc());
 
 		// Create the data reader for the video topic
-		auto dataReader = dds::sub::DataReader<S2E::Video>(sub, topic, drqos, videoListener, mask);
+		auto dataReader = dds::sub::DataReader<S2E::Video>(sub, topic, drqos, &videoListener, mask);
 
 
 		auto widget = new VideoWidgetPainterGst(subscriber.displayAppSink());

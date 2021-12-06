@@ -17,20 +17,15 @@
 #include <QDebug>
 #include <vector>
 
-VideoListener::VideoListener() :
-	m_appSrc(nullptr)
+VideoListener::VideoListener(GstAppSrc* const appSrc) :
+	m_appSrc(appSrc)
 {
+	if (appSrc == nullptr || !GST_IS_APP_SRC(appSrc))
+	{
+		throw std::range_error{"AppSrc not valid"};
+	}
 }
 
-void VideoListener::installAppSrc(GstAppSrc* appSrc)
-{
-	m_appSrc = appSrc;
-}
-
-VideoListener::~VideoListener()
-{
-	qDebug() << "Deleted VideoListener";
-}
 
 void VideoListener::on_requested_deadline_missed(
 	dds::sub::DataReader<S2E::Video>&,
@@ -43,34 +38,20 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 {
 	Q_UNUSED(reader)
 
-	GstBuffer* gstBuffer = NULL;
-	GstFlowReturn ret;
-
-	// Only process DDS frames if an appsrc is present.
-	if (m_appSrc == nullptr)
-	{
-		// TODO: May make this silent. Since this may be unavoidable if the app src
-		// is installed from another thread then this function is called. And hence
-		// the appsrc may be installed a short while after.
-		qDebug() << "Not processing arrived DDS data. Appsrc not present.";
-		return;
-	}
-
 	//Check if the GStreamer pipeline is running, by checking the state of the appsrc
 	GstState appSrcState = GST_STATE_NULL;
-	gst_element_get_state(GST_ELEMENT(m_appSrc), &appSrcState, NULL, 10/*timeout nanosec*/);
+	gst_element_get_state(GST_ELEMENT(m_appSrc), &appSrcState, nullptr /*pending*/, 10/*timeout nanosec*/);
 	if (appSrcState != GST_STATE_PLAYING && appSrcState != GST_STATE_PAUSED && appSrcState != GST_STATE_READY)
 	{
-		// Pipeline is not running, silently return;
 		qDebug() << "Pipeline not running" << appSrcState;
 		return;
 	}
 
-	// Read teh samples that came in by DDS and check its validity.
-	dds::sub::LoanedSamples<S2E::Video> samples = reader.take();
+	// Read the samples that came in by DDS and check its validity.
+	const auto samples = reader.take();
 	if (samples.length() < 1)
 	{
-		qDebug() << "Samples length";
+		qDebug() << "on_data_available triggered but not sample available";
 		return;
 	}
 
@@ -79,18 +60,16 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 	// (This may be not possible with some DDS quality of service settings
 	// but since its straight farward to implement, both behaviours
 	// is handles here)
-	for (dds::sub::LoanedSamples<S2E::Video>::const_iterator sample = samples.begin();
-		 sample < samples.end();
-		 ++sample)
+	for (const auto& sample : samples)
 	{
-		if((*sample).info().valid() == false)
+		if(sample.info().valid() == false)
 		{
 			qDebug() << "Sample is not valid";
 			continue;
 		}
-		const std::vector<uint8_t> frame = sample->data().frame();
-		auto rawDataPtr = reinterpret_cast<const void *>(frame.data());
-		auto byteCount = static_cast<const gsize>(sample->data().frame().size());
+		const auto& frame = sample.data().frame();
+		const auto rawDataPtr = reinterpret_cast<const void *>(frame.data());
+		const auto byteCount = static_cast<const gsize>(sample.data().frame().size());
 
 		// The following lines might be used to enable data handling without copying
 		// the arrived data.
@@ -109,13 +88,13 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 
 		// Copy the arrived memory from the DDS into a GStreamer buffer
 		GstMapInfo mapInfo;
-		gstBuffer = gst_buffer_new_allocate(NULL /* no allocator */, byteCount, NULL /* no parameter */);
+		auto gstBuffer = gst_buffer_new_allocate(nullptr /* no allocator */, byteCount, nullptr /* no parameter */);
 		gst_buffer_map(gstBuffer, &mapInfo, GST_MAP_WRITE);
 		std::memcpy(static_cast<void*>(mapInfo.data), rawDataPtr, byteCount);
 		gst_buffer_unmap(gstBuffer, &mapInfo);
 
 		// Push the buffer into the pipeline. Data freeing is now handled by the pipeline
-		ret = gst_app_src_push_buffer(m_appSrc, gstBuffer);
+		const auto ret = gst_app_src_push_buffer(m_appSrc, gstBuffer);
 		if (ret != GST_FLOW_OK)
 		{
 			qWarning() << "Something went wrong while injecting fram data into the display pipeline";
@@ -134,5 +113,6 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 
 void VideoListener::gstBufferDestroyCallBack(gpointer data)
 {
+	Q_UNUSED(data)
 	//TODO: If copy-free method is used, Do whats neccessary to realease memory in DDS
 }
