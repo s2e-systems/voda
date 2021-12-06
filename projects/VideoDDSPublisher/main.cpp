@@ -16,6 +16,7 @@
 #include <QCommandLineParser>
 #include <QDebug>
 #include <stdexcept>
+#include <string>
 
 #include "videoddspublisher.h"
 #include "videowidgetpaintergst.h"
@@ -73,10 +74,7 @@ int main(int argc, char *argv[])
 
 		auto dataWriter = dds::pub::DataWriter<S2E::Video>(pub, topic, dwqos);
 
-		// The message handler must be installed before GStreamer
-		// is initialized.
-		QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
-		QtGStreamer::instance()->init();
+		QtGStreamer::init(&argc, &argv, 3 /*log level*/);
 
 		VideoDDSpublisher publisher{dataWriter, parser.isSet(useTestSrcOption), parser.isSet(useOmxOption), parser.isSet(useFixedCapsOption)};
 

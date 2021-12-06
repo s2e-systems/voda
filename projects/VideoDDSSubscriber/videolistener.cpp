@@ -15,7 +15,9 @@
 #include "videolistener.h"
 
 #include <QDebug>
+#include <cstring>
 #include <vector>
+#include <stdexcept>
 
 VideoListener::VideoListener(GstAppSrc* const appSrc) :
 	m_appSrc(appSrc)
@@ -57,9 +59,6 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 
 	// It may happen that multiple samples came in in one go, in that
 	// case all the samples are pushed into the GStreamer pipeline.
-	// (This may be not possible with some DDS quality of service settings
-	// but since its straight farward to implement, both behaviours
-	// is handles here)
 	for (const auto& sample : samples)
 	{
 		if(sample.info().valid() == false)
@@ -105,7 +104,6 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 		// The app src does unfortunetly not have a sample count.
 		guint64 bufferFill;
 		g_object_get(m_appSrc, "current-level-bytes", &bufferFill, NULL);
-		// TODO: May only output this information for debug build or with a switch
 		qDebug() << "Received frameNum:" << sample->data().frameNum() << "with size" << byteCount
 				 << " appsrc buffer:" << bufferFill;
 	}
