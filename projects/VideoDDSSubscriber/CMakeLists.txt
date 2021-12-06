@@ -12,7 +12,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_AUTOMOC ON)
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
 
 find_package(GStreamer REQUIRED COMPONENTS glib gobject base app video)
 
@@ -36,7 +37,7 @@ include_directories(VideoDDSSubscriber
 )
 
 target_link_libraries(VideoDDSSubscriber
-	PRIVATE Qt6::Widgets
+	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
 	PRIVATE GStreamer::gstreamer PRIVATE GStreamer::gobject PRIVATE GStreamer::glib PRIVATE GStreamer::base PRIVATE GStreamer::app PRIVATE GStreamer::video
 	PRIVATE OpenSplice::ddskernel PRIVATE OpenSplice::dcpsisocpp2 PRIVATE OpenSplice::dcpssacpp
 )
