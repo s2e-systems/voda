@@ -19,8 +19,6 @@ find_package(GStreamer REQUIRED glib gobject base app video)
 find_package(OpenSplice REQUIRED)
 OpenSplice_IDLCPP_GEN(${CommonDir}/VideoDDS.idl ${CMAKE_CURRENT_BINARY_DIR})
 
-set_property(SOURCE ${OpenSplice_GENERATED_SOURCES} PROPERTY SKIP_AUTOMOC ON)
-
 add_executable(VideoDDSPublisher
 	${OpenSplice_GENERATED_SOURCES}
 	${SourceDir}/main.cpp
