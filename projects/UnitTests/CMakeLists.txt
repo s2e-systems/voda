@@ -1,20 +1,16 @@
+cmake_minimum_required(VERSION 3.14)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake")
 
 include(FetchContent)
 FetchContent_Declare(googletest
 	GIT_REPOSITORY https://github.com/google/googletest.git
-	GIT_TAG 2fe3bd994b3189899d93f1d5a881e725e046fdc2 # release-1.8.1
+	GIT_TAG e2239ee6043f73722e7aa812a459f54a28552929 # release-1.11.0
 )
-# NOTE: "A more concise way of expressing the following is available with
-# CMake 3.14 or later" [Professional CMake]
-FetchContent_GetProperties(googletest)
-if(NOT GoogleTest_POPULATED)
-	FetchContent_Populate(googletest)
-	add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
-endif()
+FetchContent_MakeAvailable(googletest)
 
 find_package(GStreamer REQUIRED glib gobject base app video codecparsers)
-find_package(Qt5Widgets REQUIRED)
+find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
 
 add_definitions( -DGST_USE_UNSTABLE_API)
 
@@ -55,6 +51,6 @@ gtest_discover_tests(tests_automatic)
 target_link_libraries(tests_manual PRIVATE
 	gtest
 	GStreamer::gstreamer GStreamer::glib GStreamer::gobject GStreamer::base GStreamer::app GStreamer::video
-	Qt5::Widgets
+	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
 )
 gtest_discover_tests(tests_manual)
