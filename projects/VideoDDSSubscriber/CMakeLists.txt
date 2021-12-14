@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1.0)
-project(VideoDDSSubscriber)
+project(VideoDDSSubscriber LANGUAGES CXX)
 
 set(CommonDir "../Common")
 set(SourceDir ".")
@@ -16,11 +16,14 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
 
 find_package(GStreamer REQUIRED COMPONENTS glib gobject base app video)
 
-find_package(OpenSplice REQUIRED)
-OpenSplice_IDLCPP_GEN(${CommonDir}/VideoDDS.idl ${CMAKE_CURRENT_BINARY_DIR})
+if(NOT TARGET CycloneDDS-CXX::ddscxx)
+	find_package(CycloneDDS-CXX REQUIRED)
+endif()
+if(NOT TARGET VideoDDS)
+	idlcxx_generate(TARGET VideoDDS FILES ../Common/VideoDDS.idl)
+endif()
 
 add_executable(VideoDDSSubscriber
-	${OpenSplice_GENERATED_SOURCES}
 	${SourceDir}/main.cpp
 	${SourceDir}/videoddssubscriber.cpp
 	${SourceDir}/videolistener.cpp
@@ -35,6 +38,12 @@ include_directories(VideoDDSSubscriber
 
 target_link_libraries(VideoDDSSubscriber
 	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
-	PRIVATE GStreamer::gstreamer PRIVATE GStreamer::gobject PRIVATE GStreamer::glib PRIVATE GStreamer::base PRIVATE GStreamer::app PRIVATE GStreamer::video
-	PRIVATE OpenSplice::ddskernel PRIVATE OpenSplice::dcpsisocpp2 PRIVATE OpenSplice::dcpssacpp
+	PRIVATE GStreamer::gstreamer
+	PRIVATE GStreamer::gobject
+	PRIVATE GStreamer::glib
+	PRIVATE GStreamer::base
+	PRIVATE GStreamer::app
+	PRIVATE GStreamer::video
+	PRIVATE CycloneDDS-CXX::ddscxx
+	PRIVATE VideoDDS
 )

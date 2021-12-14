@@ -22,6 +22,9 @@
 #include "videolistener.h"
 #include "videowidgetpaintergst.h"
 
+#include "dds/dds.hpp"
+#include "VideoDDS.hpp"
+using namespace org::eclipse::cyclonedds;
 
 int main(int argc, char *argv[])
 {
@@ -44,7 +47,7 @@ int main(int argc, char *argv[])
 	try
 	{
 		// Create a domain participant using the default ID configured on the XML file
-		dds::domain::DomainParticipant dp(org::opensplice::domain::default_id());
+		dds::domain::DomainParticipant dp(domain::default_id());
 
 		// Create a topic QoS with exclusive ownership. The exclusive ownership allows
 		// the use of the ownership strength to define which video source is used.
