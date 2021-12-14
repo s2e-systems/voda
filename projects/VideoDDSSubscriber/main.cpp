@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QDebug>
 #include <QCommandLineParser>
+#include <string>
 
 #include "qtgstreamer.h"
 #include "videoddssubscriber.h"
@@ -71,21 +72,16 @@ int main(int argc, char *argv[])
 		mask << dds::core::status::StatusMask::data_available()
 			 << dds::core::status::StatusMask::requested_deadline_missed();
 
-
-		// Message handler must be installed before GStreamer init()
-		QtGStreamer::instance()->installMessageHandler(3 /*log level*/);
-		QtGStreamer::instance()->init();
+		QtGStreamer::init(&argc, &argv, 3 /*log level*/);
 
 		VideoDDSsubscriber subscriber(parser.isSet(useOmxOption));
 
 		// Create a video listener which triggers the callbacks necessary for showing
 		// the video data when a new message is received
-		auto videoListener = new VideoListener();
-		videoListener->installAppSrc(subscriber.ddsAppSrc());
+		VideoListener videoListener(subscriber.ddsAppSrc());
 
 		// Create the data reader for the video topic
-		auto dataReader = dds::sub::DataReader<S2E::Video>(sub, topic, drqos, videoListener, mask);
-
+		auto dataReader = dds::sub::DataReader<S2E::Video>(sub, topic, drqos, &videoListener, mask);
 
 		auto widget = new VideoWidgetPainterGst(subscriber.displayAppSink());
 		widget->show();

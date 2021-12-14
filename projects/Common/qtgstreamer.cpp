@@ -15,30 +15,70 @@
 #include "qtgstreamer.h"
 
 #include <QDebug>
-#include <QCoreApplication>
+#include <stdexcept>
+#include <string>
 
 QtGStreamer* QtGStreamer::m_instance = nullptr;
 
-QtGStreamer* QtGStreamer::instance()
+QtGStreamer* QtGStreamer::init(int* argc, char ***argv, int debugLevel)
 {
 	// Only allow one instance
 	if (m_instance == nullptr)
 	{
+		if (gst_is_initialized())
+		{
+			throw std::runtime_error{"Gstreamer must not be initialized"};
+		}
+
 		m_instance = new QtGStreamer();
-		qRegisterMetaType<GstDebugLevel>("GstDebugLevel");
+
+		// Set the debug level for all classes
+		// Can still be overwritten by the GST_DEBUG environment variable
+		// This function can be used before gst_init() (as stated in GStreamer doc)
+		gst_debug_set_default_threshold(static_cast<GstDebugLevel>(debugLevel));
+
+		// Replace the log function
+		gst_debug_remove_log_function(&gst_debug_log_default);
+		gst_debug_add_log_function(&gstLogFunction, nullptr /*user_data*/, nullptr /*notify*/);
+
+		// Disables colors of the debug output from gstreamer
+		// If the default is used it becomes unreadable on cmd line terminals
+		// with white background
+		gst_debug_set_color_mode(GST_DEBUG_COLOR_MODE_OFF);
+		//Not threadsafe:
+		// "debugging messages are sent to the debugging handlers"
+		gst_debug_set_active(TRUE);
+
+		GError* gerr = nullptr;
+		auto gret = gst_init_check(argc, argv, &gerr);
+		if (!gret)
+		{
+			const std::string err = "Could not initialize GStreamer: " + std::string(gerr->message);
+			g_error_free(gerr);
+			throw std::runtime_error{err};
+		}
+
+		guint major;
+		guint minor;
+		guint micro;
+		guint nano;
+		gst_version(&major, &minor, &micro, &nano);
+		qInfo("GStreamer version %d.%d.%d.%d\n", major, minor, micro, nano);
 	}
 	return m_instance;
 }
 
 
-void QtGStreamer::gstLogFunction(GstDebugCategory* category,
-				   GstDebugLevel level,
-				   const gchar* file,
-				   const gchar* function,
-				   gint line,
-				   GObject* object,
-				   GstDebugMessage* message,
-				   gpointer user_data)
+void QtGStreamer::gstLogFunction(
+		GstDebugCategory* category,
+		GstDebugLevel level,
+		const gchar* file,
+		const gchar* function,
+		gint line,
+		GObject* object,
+		GstDebugMessage* message,
+		gpointer user_data
+	)
 {
 	Q_UNUSED(category)
 	Q_UNUSED(file)
@@ -46,19 +86,9 @@ void QtGStreamer::gstLogFunction(GstDebugCategory* category,
 	Q_UNUSED(line)
 	Q_UNUSED(user_data)
 
-	QString objectName;
-
-	// The QString is contructed here while creating
-	// new memory and the original char* message can
-	// be destroyed safely.
-	// The QString is then passed to the
-	// invokeMethod with a queued connection, this will keep a reference to
-	// this QString (due to the implicit sharing it uses)
-	// and will only be destroyed after the invoked method
-	// is finished. Important is only that the
 	QString qMsg(gst_debug_message_get(message));
 
-	if (object != NULL)
+	if (object != nullptr)
 	{
 		// Note that gst_object_get_name() is blocking here.
 		// This may be because the object itself is emmitting this
@@ -67,102 +97,36 @@ void QtGStreamer::gstLogFunction(GstDebugCategory* category,
 		// A similar behaviour with gst_object_get_parent(), hence
 		// The parents name is not determined here
 		// (even if it would be interessting)
-		objectName = QString(GST_OBJECT_NAME(object));
+		const QString objectName(GST_OBJECT_NAME(object));
+		if (objectName.isEmpty() == false)
+		{
+			qMsg = objectName + ":" + qMsg;
+		}
 	}
 
-	if (objectName.isEmpty() == false)
-	{
-		qMsg = objectName + ":" + qMsg;
-	}
-
-	// Use a queuedconnection to explicitly let the function be executed
-	// in the GUI thread, such that the QDebug functions run safely.
-	QMetaObject::invokeMethod(QtGStreamer::instance(), "printMessage", Qt::QueuedConnection,
-							  Q_ARG(GstDebugLevel, level),
-							  Q_ARG(QString, qMsg));
-}
-
-void QtGStreamer::printMessage(GstDebugLevel level, const QString msg)
-{
+	// Note: since around Qt 5.5 the qDebug, qWarining and qInfo functions are marked as thread safe
 	switch (level)
 	{
 	case GST_LEVEL_NONE:
-		qWarning().noquote() << "Gst:" << msg;
+		qWarning().noquote() << "Gst:" << qMsg;
 		break;
 	case GST_LEVEL_ERROR:
 	case GST_LEVEL_WARNING:
-		qWarning().noquote() << "GstWarn:" << msg;
+		qWarning().noquote() << "GstWarn:" << qMsg;
 		break;
 	case GST_LEVEL_FIXME:
 	case GST_LEVEL_INFO:
 	case GST_LEVEL_DEBUG:
-		qDebug().noquote() << "GstInfo:" << msg;
+		qDebug().noquote() << "GstInfo:" << qMsg;
 		break;
 	case GST_LEVEL_LOG:
 	case GST_LEVEL_TRACE:
 	case GST_LEVEL_MEMDUMP:
-		qInfo().noquote() << "GstLog:" << msg;
+		qInfo().noquote() << "GstLog:" << qMsg;
 		break;
 	default:
-		qInfo().noquote() << "GstDefault:" << msg;
+		qInfo().noquote() << "GstDefault:" << qMsg;
 		break;
-	}
-}
-
-bool QtGStreamer::init()
-{
-	GError* gerr = NULL;
-	gboolean gret;
-
-	if (gst_is_initialized() == FALSE)
-	{
-		// TODO: pipe application arguments here (if present)
-		gret = gst_init_check(NULL /*argc*/, NULL /*argv*/, &gerr);
-		if (gret == FALSE)
-		{
-			qCritical("Could not initialize GStreamer: %s", gerr->message);
-			g_error_free(gerr);
-			return false;
-		}
-	}
-
-	guint major;
-	guint minor;
-	guint micro;
-	guint nano;
-
-	gst_version(&major, &minor, &micro, &nano);
-
-	qInfo("GStreamer version %d.%d.%d.%d\n", major, minor, micro, nano);
-
-	return true;
-}
-
-void QtGStreamer::installMessageHandler(int level)
-{
-	if (gst_is_initialized() == TRUE)
-	{
-		qWarning() << "The message handler must be installed before GStreamer is initialized!";
-	}
-	else
-	{
-		// Set the debug level for all classes
-		// Can still be overwritten by the GST_DEBUG environment variable
-		// This function can be used before gst_init() (as stated in GStreamer doc)
-		gst_debug_set_default_threshold(static_cast<GstDebugLevel>(level));
-
-		// Replace the log function
-		gst_debug_remove_log_function(&gst_debug_log_default);
-		gst_debug_add_log_function(&gstLogFunction, NULL /*user_data*/, NULL /*notify*/);
-
-		// Disables colors of the debug output from gstreamer
-		// If the default is used it becomes unreadable on cmd line terminals
-		// with white background
-		gst_debug_set_color_mode(GST_DEBUG_COLOR_MODE_OFF);
-		//Not threadsafe (so this function show be called from the same thread as the
-		// init() function was called)
-		// "debugging messages are sent to the debugging handlers"
-		gst_debug_set_active(TRUE);
 	}
 }
 
@@ -172,20 +136,19 @@ GstBusSyncReply QtGStreamer::busCallBack(GstBus* bus, GstMessage* msg, gpointer 
 	Q_UNUSED(bus)
 	Q_UNUSED(data)
 
-	gchar* debug = NULL;
-	GError* err = NULL;
+	gchar* debug = nullptr;
+	GError* err = nullptr;
 
-	GstObject const* msgSrcObj = msg->src;
-	GstObject const* parentObj = NULL;
+	const auto msgSrcObj = msg->src;
 	QString objName;
 	QString parentObjName;
 
-	if (msgSrcObj != NULL)
+	if (msgSrcObj != nullptr)
 	{
 		objName = QString(GST_OBJECT_NAME(msgSrcObj));
 
-		parentObj = gst_object_get_parent(GST_OBJECT_CAST(msgSrcObj));
-		if (parentObj != NULL)
+		const auto parentObj = gst_object_get_parent(GST_OBJECT_CAST(msgSrcObj));
+		if (parentObj != nullptr)
 		{
 			parentObjName = QString(GST_OBJECT_NAME(parentObj));
 		}
@@ -212,7 +175,7 @@ GstBusSyncReply QtGStreamer::busCallBack(GstBus* bus, GstMessage* msg, gpointer 
 		qWarning().noquote() << srcObjName << err->message;
 		g_error_free(err);
 
-		if (debug != NULL)
+		if (debug != nullptr)
 		{
 			qWarning("Debug details: %s", debug);
 			g_free(debug);
@@ -224,7 +187,7 @@ GstBusSyncReply QtGStreamer::busCallBack(GstBus* bus, GstMessage* msg, gpointer 
 		qWarning().noquote() << srcObjName << err->message;
 		g_error_free(err);
 
-		if (debug != NULL)
+		if (debug != nullptr)
 		{
 			qWarning("Debug details: %s", debug);
 			g_free(debug);
@@ -233,14 +196,13 @@ GstBusSyncReply QtGStreamer::busCallBack(GstBus* bus, GstMessage* msg, gpointer 
 	case GST_MESSAGE_STATE_CHANGED:
 		GstState oldState;
 		GstState newState;
-		gst_message_parse_state_changed(msg, &oldState, &newState, NULL);
+		gst_message_parse_state_changed(msg, &oldState, &newState, nullptr);
 		qDebug().noquote() << QString("GST-STATE-CHANGED (%1) %2 -> %3")
 		.arg(srcObjName)
 		.arg(gst_element_state_get_name(oldState))
 		.arg(gst_element_state_get_name(newState));
 		break;
 	default:
-		//qDebug() << "Bus message arrived of type" << GST_MESSAGE_TYPE(msg);
 		break;
 	}
 

@@ -15,60 +15,34 @@
 #ifndef QTGSTREAMER_H
 #define QTGSTREAMER_H
 
-#include <QObject>
-
 #include <gst/gst.h>
 #include <gst/gstinfo.h>
 
 /**
  *  Can be used to transfer the GStreamer debug output to
  *  qDebug functions.
- *  A compount GStreamer initialization is also provided.
- *
- *  This class is based on QObject which allows the transfer
- *  of the messages from any GStreamer thread to the main
- *  Qt thread, such that qDebug() and such work safely.
  *
  *  This class is a singelton which corresponds to the exiting
  *  of one, and only one GStreamer instance.
  */
-class QtGStreamer : public QObject
+class QtGStreamer
 {
 
 public:
 
 	/**
-	 * Get the one and only instance.
-	 */
-	static QtGStreamer* instance();
-
-	/**
 	 * Initialize GStreamer while checking errors.
 	 * An information is printed with the found GStreamer version.
+	 * Returns the singleton instance
 	 */
-	static bool init();
+	static QtGStreamer* init(int* argc, char ***argv, int debugLevel);
 
 	/**
-	 * Removes the default debug message handler from GStreamer
-	 * and installs QtGstreamer::gstLogFunction()
-	 */
-	static void installMessageHandler(int level = 1);
-
-	/**
-	 * TODO: This function uses QDebug objects to output the messages. Since
-	 * the callBack may be invoked by a different thread then the main Qt trhead,
-	 * this function may crash!!! FIXME: Include a Qt::queuedConnection similar
-	 * to the one used by QtGStreamer.
+	 * Displays msg with QDebug functions
 	 */
 	static GstBusSyncReply busCallBack(GstBus* bus, GstMessage* msg, gpointer data);
 
-	/**
-	 * Depending on the level, the msg will be passed to qDebug, qWarning,
-	 * qInfo or qError.
-	 */
-	static void printMessage(GstDebugLevel level, QString const msg);
-
-protected:
+private:
 
 	/**
 	 * GStreamer log funtion as needed by gst_debug_add_log_function().
@@ -86,17 +60,10 @@ protected:
 								GstDebugMessage *message,
 								gpointer user_data) G_GNUC_NO_INSTRUMENT;
 
-	/**
-	 * May be used for the install message handler.
-	 * At this stage its not used.
-	 */
-	static void notify(gpointer data){ Q_UNUSED(data) }
-
-private:
 	// Make contructors private such that they cannot be used
-	QtGStreamer(QObject* parent = nullptr) : QObject(parent){}
-	QtGStreamer(QtGStreamer const&) : QObject(nullptr){}
-	QtGStreamer& operator=(QtGStreamer const&){return *this;}
+	QtGStreamer(){}
+	QtGStreamer(QtGStreamer const&) = delete;
+	QtGStreamer& operator=(QtGStreamer const&) = delete;
 
 	/**
 	 * This one and only instance.
