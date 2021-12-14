@@ -16,12 +16,8 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
 
 find_package(GStreamer REQUIRED COMPONENTS glib gobject base app video)
 
-if(NOT TARGET CycloneDDS-CXX::ddscxx)
-	find_package(CycloneDDS-CXX REQUIRED)
-endif()
-if(NOT TARGET VideoDDS)
-	idlcxx_generate(TARGET VideoDDS FILES ../Common/VideoDDS.idl)
-endif()
+find_package(CycloneDDS-CXX REQUIRED)
+idlcxx_generate(TARGET GeneratedIdlSubscriber FILES ${CommonDir}/VideoDDS.idl)
 
 add_executable(VideoDDSSubscriber
 	${SourceDir}/main.cpp
@@ -45,5 +41,5 @@ target_link_libraries(VideoDDSSubscriber
 	PRIVATE GStreamer::app
 	PRIVATE GStreamer::video
 	PRIVATE CycloneDDS-CXX::ddscxx
-	PRIVATE VideoDDS
+	PRIVATE GeneratedIdlSubscriber
 )
