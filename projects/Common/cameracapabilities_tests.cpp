@@ -1,18 +1,5 @@
-#include <gtest/gtest.h>
-
-#include "elements.h"
 #include "cameracapabilities.h"
-
-TEST(ElementSelection, Selection)
-{
-	gst_init(nullptr, nullptr);
-	ElementSelection e{{"noneexistent", "videotestsrc", "fakesink"}, "name"};
-	EXPECT_EQ(e.elementName(), "videotestsrc");
-
-	EXPECT_THROW((ElementSelection{{"noneexistent"}, "name"}), std::runtime_error);
-
-	gst_deinit();
-}
+#include <gtest/gtest.h>
 
 TEST(CapabilitySelectionTest, highestRawFrameRate)
 {
@@ -136,9 +123,3 @@ TEST(CapabilitySelectionTest, highestRawAreaWithMinimumFramerate)
 	gst_caps_unref(caps);
 }
 
-int main(int argc, char **argv)
-{
-	gst_init(&argc, &argv);
-	::testing::InitGoogleTest(&argc, argv);
-	return RUN_ALL_TESTS();
-}
