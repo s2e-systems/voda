@@ -22,6 +22,10 @@
 #include "videowidgetpaintergst.h"
 #include "qtgstreamer.h"
 
+#include "dds/dds.hpp"
+#include "VideoDDS.hpp"
+using namespace org::eclipse::cyclonedds;
+
 int main(int argc, char *argv[])
 {
 	QApplication application(argc, argv);
@@ -47,25 +51,15 @@ int main(int argc, char *argv[])
 	try
 	{
 		// Create a domain participant using the default ID configured on the XML file
-		dds::domain::DomainParticipant dp(org::opensplice::domain::default_id());
-
+		dds::domain::DomainParticipant dp(domain::default_id());
+		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
+		dds::topic::Topic<S2E::Video> topic(dp, topicName, topicQos);
+		dds::pub::qos::PublisherQos pubQos = dp.default_publisher_qos();
+		dds::pub::Publisher pub(dp, pubQos);
 		// Create a topic QoS with exclusive ownership and defined liveliness.
 		// The exclusive ownership allows the use of the ownership strength to define which video source is used.
 		// The liveliness topic determines how to long to wait until the source with lower strength is used
 		// when messages are not received from the source with higher ownership strength.
-		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
-		//	The dds::core::policy::Liveliness qos setting had been previously added here and is now
-		// (probably) at the data writer QoS. This was done to prevent a crash that was caused
-		// by having the dataReader without the Liveliness setting
-		// Further option may be:
-		//	<< dds::core::policy::Durability::Volatile()
-		//	<< dds::core::policy::Reliability::BestEffort();
-
-		dds::topic::Topic<S2E::Video> topic(dp, topicName, topicQos);
-
-		dds::pub::qos::PublisherQos pubQos = dp.default_publisher_qos();
-		dds::pub::Publisher pub(dp, pubQos);
-
 		dds::pub::qos::DataWriterQos dwqos = topic.qos();
 		dwqos << dds::core::policy::OwnershipStrength(parser.value(strengthOption).toInt());
 		dwqos << dds::core::policy::WriterDataLifecycle::AutoDisposeUnregisteredInstances();

@@ -22,6 +22,9 @@
 #include "videolistener.h"
 #include "videowidgetpaintergst.h"
 
+#include "dds/dds.hpp"
+#include "VideoDDS.hpp"
+using namespace org::eclipse::cyclonedds;
 
 int main(int argc, char *argv[])
 {
@@ -43,21 +46,12 @@ int main(int argc, char *argv[])
 
 	try
 	{
-		// Create a domain participant using the default ID configured on the XML file
-		dds::domain::DomainParticipant dp(org::opensplice::domain::default_id());
+		dds::domain::DomainParticipant dp(domain::default_id());
 
 		// Create a topic QoS with exclusive ownership. The exclusive ownership allows
 		// the use of the ownership strength to define which video source is used.
 		dds::topic::qos::TopicQos topicQos = dp.default_topic_qos();
-//				<< dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(1000));
-		// Following settings might be interesting for other usecases:
-		//	<< dds::core::policy::Durability::Transient()
-		//	<< dds::core::policy::Reliability::BestEffort();
-
-		// Create a topic
 		dds::topic::Topic<S2E::Video> topic(dp, topicName, topicQos);
-
-		// Create a subscriber with a default QoS
 		dds::sub::qos::SubscriberQos subQos = dp.default_subscriber_qos();
 		dds::sub::Subscriber sub(dp, subQos);
 

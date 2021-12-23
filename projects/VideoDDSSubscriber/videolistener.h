@@ -18,7 +18,9 @@
 #include <QObject>
 #include <gst/app/gstappsrc.h>
 
-#include "VideoDDS_DCPS.hpp"
+#include "dds/dds.hpp"
+#include "VideoDDS.hpp"
+using namespace org::eclipse::cyclonedds;
 
 /**
  * This class is a DDS Data Reader Listener and can be used to listen to

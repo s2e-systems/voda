@@ -15,7 +15,9 @@
 #ifndef VIDEODDSPUBLISHER_H
 #define VIDEODDSPUBLISHER_H
 
-#include "VideoDDS_DCPS.hpp"
+#include "dds/dds.hpp"
+#include "VideoDDS.hpp"
+
 #include <gst/gstelement.h>
 #include <gst/app/gstappsink.h>
 
