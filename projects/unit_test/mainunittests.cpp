@@ -9,7 +9,8 @@ int main(int argc, char **argv)
 	{
 		const std::string err{"Could not initialize GStreamer: " + std::string{gerr->message}};
 		g_error_free(gerr);
-		FAIL() << err;
+		std::cerr << err << std::endl;
+		return -1;
 	}
 
 	::testing::InitGoogleTest(&argc, argv);

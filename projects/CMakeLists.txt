@@ -12,22 +12,22 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
 find_package(GStreamer REQUIRED COMPONENTS glib gobject base app video)
 
 find_package(CycloneDDS-CXX REQUIRED)
-idlcxx_generate(TARGET GeneratedIdl FILES Common/VideoDDS.idl)
+idlcxx_generate(TARGET GeneratedIdl FILES common/VideoDDS.idl)
 
 add_executable(VideoDDSSubscriber
-	VideoDDSSubscriber/main.cpp
-	VideoDDSSubscriber/videoddssubscriber.h
-	VideoDDSSubscriber/videoddssubscriber.cpp
-	VideoDDSSubscriber/videolistener.h
-	VideoDDSSubscriber/videolistener.cpp
-	Common/qtgstreamer.h
-	Common/qtgstreamer.cpp
-	Common/videowidgetpaintergst.h
-	Common/videowidgetpaintergst.cpp
+	subscriber/main.cpp
+	subscriber/videoddssubscriber.h
+	subscriber/videoddssubscriber.cpp
+	subscriber/videolistener.h
+	subscriber/videolistener.cpp
+	common/qtgstreamer.h
+	common/qtgstreamer.cpp
+	common/videowidgetpaintergst.h
+	common/videowidgetpaintergst.cpp
 )
 target_include_directories(VideoDDSSubscriber PRIVATE
 	VideoDDSSubscriber
-	Common
+	common
 )
 target_link_libraries(VideoDDSSubscriber
 	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
@@ -44,21 +44,21 @@ target_compile_features(VideoDDSSubscriber PRIVATE cxx_std_17)
 
 
 add_executable(VideoDDSPublisher
-	VideoDDSPublisher/main.cpp
-	VideoDDSPublisher/videoddspublisher.h
-	VideoDDSPublisher/videoddspublisher.cpp
-	Common/qtgstreamer.h
-	Common/qtgstreamer.cpp
-	Common/videowidgetpaintergst.h
-	Common/videowidgetpaintergst.cpp
-	Common/cameracapabilities.h
-	Common/cameracapabilities.cpp
-	Common/elements.h
-	Common/elements.cpp
+	publisher/main.cpp
+	publisher/videoddspublisher.h
+	publisher/videoddspublisher.cpp
+	common/qtgstreamer.h
+	common/qtgstreamer.cpp
+	common/videowidgetpaintergst.h
+	common/videowidgetpaintergst.cpp
+	common/cameracapabilities.h
+	common/cameracapabilities.cpp
+	common/elements.h
+	common/elements.cpp
 )
 target_include_directories(VideoDDSPublisher PRIVATE
 	VideoDDSPublisher
-	Common
+	common
 )
 target_link_libraries(VideoDDSPublisher
 	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
@@ -79,42 +79,42 @@ if (${BUILD_UNIT_TESTS})
 	include(FetchContent)
 	FetchContent_Declare(googletest
 		GIT_REPOSITORY https://github.com/google/googletest.git
-		GIT_TAG e2239ee6043f73722e7aa812a459f54a28552929 # release-1.11.0
+		GIT_TAG release-1.11.0
 	)
 	set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 	FetchContent_MakeAvailable(googletest)
 
-	set(VODA_UNITTEST_DATA_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/UnitTests/data")
-	configure_file(UnitTest/config.h.in config.h)
+	set(VODA_UNITTEST_DATA_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/unit_tests/data")
+	configure_file(unit_test/config.h.in config.h)
 
 
-	add_executable(UnitTests
-		UnitTest/mainunittests.cpp
-		Common/cameracapabilities.h
-		Common/cameracapabilities.cpp
-		Common/cameracapabilities_tests.cpp
-		Common/elements.h
-		Common/elements.cpp
-		Common/elements_tests.cpp
+	add_executable(run_unit_tests
+		unit_test/mainunittests.cpp
+		common/cameracapabilities.h
+		common/cameracapabilities.cpp
+		common/cameracapabilities_tests.cpp
+		common/elements.h
+		common/elements.cpp
+		common/elements_tests.cpp
 	)
-	target_link_libraries(UnitTests
+	target_link_libraries(run_unit_tests
 		PRIVATE gtest
 		PRIVATE GStreamer::gstreamer
 		PRIVATE GStreamer::glib
 		PRIVATE GStreamer::gobject
 	)
-	target_include_directories(UnitTests
-		PRIVATE Common
+	target_include_directories(run_unit_tests
+		PRIVATE common
 	)
-	target_compile_features(UnitTests PRIVATE cxx_std_17)
+	target_compile_features(run_unit_tests PRIVATE cxx_std_17)
 	include(GoogleTest)
 
 
 
-	add_executable(UnitTests_recorder
-		UnitTest/mainrecorder.cpp
+	add_executable(unit_tests_recorder
+		unit_test/mainrecorder.cpp
 	)
-	target_link_libraries(UnitTests_recorder
+	target_link_libraries(unit_tests_recorder
 		PRIVATE GStreamer::gstreamer
 		PRIVATE GStreamer::glib
 		PRIVATE GStreamer::gobject
@@ -122,6 +122,6 @@ if (${BUILD_UNIT_TESTS})
 		PRIVATE GStreamer::app
 		PRIVATE GStreamer::video
 	)
-	target_compile_features(UnitTests_recorder PRIVATE cxx_std_17)
+	target_compile_features(unit_tests_recorder PRIVATE cxx_std_17)
 
 endif()
