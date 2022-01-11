@@ -14,21 +14,12 @@
 
 #include "videoddssubscriber.h"
 
-#include <QDebug>
-
-#include "qtgstreamer.h"
-#include "videolistener.h"
-
-#include "videowidgetpaintergst.h"
+#include  <stdexcept>
 
 VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 {
 
 	auto pipeline = gst_pipeline_new("subscriber");
-	auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
-	gst_bus_set_sync_handler(bus, QtGStreamer::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
-	gst_object_unref(bus);
-
 	auto srcCaps = gst_caps_new_simple("video/x-h264",
 		"stream-format", G_TYPE_STRING, "byte-stream",
 		"alignment", G_TYPE_STRING, "au",
@@ -80,8 +71,10 @@ VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 	auto pipelineStartSucess = gst_element_set_state(pipeline, GST_STATE_PLAYING);
 	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
 	{
-		qWarning() << "Set pipeline to playing failed";
+		auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
 		gst_bus_set_flushing(bus, true);
+		gst_object_unref(bus);
+		throw std::runtime_error{"Set pipeline to playing failed"};
 	}
 }
 

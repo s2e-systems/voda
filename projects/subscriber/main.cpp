@@ -70,6 +70,12 @@ int main(int argc, char *argv[])
 
 		VideoDDSsubscriber subscriber(parser.isSet(useOmxOption));
 
+		auto pipeline = gst_element_get_parent(subscriber.ddsAppSrc());
+		auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+		gst_bus_set_sync_handler(bus, QtGStreamer::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
+		gst_object_unref(bus);
+		gst_object_unref(pipeline);
+
 		// Create a video listener which triggers the callbacks necessary for showing
 		// the video data when a new message is received
 		VideoListener videoListener(subscriber.ddsAppSrc());
@@ -97,6 +103,10 @@ int main(int argc, char *argv[])
 	catch(const dds::core::Error& e)
 	{
 		qCritical("DDS Error: %s", e.what());
+	}
+	catch(const std::runtime_error& e)
+	{
+		qCritical("Runtime error: %s", e.what());
 	}
 	catch(...)
 	{
