@@ -84,7 +84,7 @@ if (${BUILD_UNIT_TESTS})
 	set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 	FetchContent_MakeAvailable(googletest)
 
-	set(VODA_UNITTEST_DATA_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/unit_tests/data")
+	set(VODA_UNITTEST_DATA_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/unit_test/data")
 	configure_file(unit_test/config.h.in config.h)
 
 
@@ -96,15 +96,20 @@ if (${BUILD_UNIT_TESTS})
 		common/elements.h
 		common/elements.cpp
 		common/elements_tests.cpp
+		subscriber/videoddssubscriber.cpp
+		subscriber/videoddssubscriber_tests.cpp
+		${CMAKE_CURRENT_BINARY_DIR}/config.h
 	)
 	target_link_libraries(run_unit_tests
 		PRIVATE gtest
 		PRIVATE GStreamer::gstreamer
 		PRIVATE GStreamer::glib
 		PRIVATE GStreamer::gobject
+		PRIVATE GStreamer::app
 	)
 	target_include_directories(run_unit_tests
 		PRIVATE common
+		PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
 	)
 	target_compile_features(run_unit_tests PRIVATE cxx_std_17)
 	include(GoogleTest)

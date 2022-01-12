@@ -18,8 +18,11 @@
 
 VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 {
-
 	auto pipeline = gst_pipeline_new("subscriber");
+	if (pipeline == nullptr)
+	{
+		throw std::runtime_error{"gst_pipeline_new failed"};
+	}
 	auto srcCaps = gst_caps_new_simple("video/x-h264",
 		"stream-format", G_TYPE_STRING, "byte-stream",
 		"alignment", G_TYPE_STRING, "au",
@@ -27,6 +30,10 @@ VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 	);
 
 	m_ddsAppSrc = gst_element_factory_make("appsrc", nullptr);
+	if (m_ddsAppSrc == nullptr)
+	{
+		throw std::runtime_error{"gst_element_factory_make appsrc failed"};
+	}
 	g_object_set(m_ddsAppSrc,
 		"caps", srcCaps,
 		"is-live", true,
