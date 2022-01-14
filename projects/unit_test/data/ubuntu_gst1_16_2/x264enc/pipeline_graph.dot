@@ -1,0 +1,118 @@
+digraph pipeline {
+  rankdir=LR;
+  fontname="sans";
+  fontsize="10";
+  labelloc=t;
+  nodesep=.1;
+  ranksep=.2;
+  label="<GstPipeline>\npipeline\n[>]";
+  node [style="filled,rounded", shape=box, fontsize="9", fontname="sans", margin="0.0,0.0"];
+  edge [labelfontsize="6", fontsize="9", fontname="monospace"];
+  
+  legend [
+    pos="0,0!",
+    margin="0.05,0.05",
+    style="filled",
+    label="Legend\lElement-States: [~] void-pending, [0] null, [-] ready, [=] paused, [>] playing\lPad-Activation: [-] none, [>] push, [<] pull\lPad-Flags: [b]locked, [f]lushing, [b]locking, [E]OS; upper-case is set\lPad-Task: [T] has started task, [t] has paused task\l",
+  ];
+  subgraph cluster_capsfilter1_0x560a143da590 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstCapsFilter\ncapsfilter1\n[>]\nparent=(GstPipeline) pipeline\ncaps=video/x-h264, stream-format=(string)byte-stream, alignment=(string)au";
+    subgraph cluster_capsfilter1_0x560a143da590_sink {
+      label="";
+      style="invis";
+      capsfilter1_0x560a143da590_sink_0x560a143c2fb0 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    subgraph cluster_capsfilter1_0x560a143da590_src {
+      label="";
+      style="invis";
+      capsfilter1_0x560a143da590_src_0x560a143c3200 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    capsfilter1_0x560a143da590_sink_0x560a143c2fb0 -> capsfilter1_0x560a143da590_src_0x560a143c3200 [style="invis"];
+    fillcolor="#aaffaa";
+  }
+
+  capsfilter1_0x560a143da590_src_0x560a143c3200 -> multifilesink0_0x560a143d0270_sink_0x560a143c28c0 [label="video/x-h264\l       stream-format: byte-stream\l           alignment: au\l               level: 1b\l             profile: constrained-baseline\l               width: 48\l              height: 32\l  pixel-aspect-ratio: 1/1\l           framerate: 30/1\l      interlace-mode: progressive\l         colorimetry: bt601\l         chroma-site: jpeg\l      multiview-mode: mono\l     multiview-flags: 0:ffffffff:/right-view...\l"]
+  subgraph cluster_capsfilter0_0x560a143da250 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstCapsFilter\ncapsfilter0\n[>]\nparent=(GstPipeline) pipeline\ncaps=video/x-raw, format=(string)I420, width=(int)48, height=(int)32";
+    subgraph cluster_capsfilter0_0x560a143da250_sink {
+      label="";
+      style="invis";
+      capsfilter0_0x560a143da250_sink_0x560a143c2b10 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    subgraph cluster_capsfilter0_0x560a143da250_src {
+      label="";
+      style="invis";
+      capsfilter0_0x560a143da250_src_0x560a143c2d60 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    capsfilter0_0x560a143da250_sink_0x560a143c2b10 -> capsfilter0_0x560a143da250_src_0x560a143c2d60 [style="invis"];
+    fillcolor="#aaffaa";
+  }
+
+  capsfilter0_0x560a143da250_src_0x560a143c2d60 -> x264enc0_0x560a143ca4f0_sink_0x560a143c2420 [label="video/x-raw\l              format: I420\l               width: 48\l              height: 32\l           framerate: 30/1\l      multiview-mode: mono\l  pixel-aspect-ratio: 1/1\l      interlace-mode: progressive\l"]
+  subgraph cluster_multifilesink0_0x560a143d0270 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstMultiFileSink\nmultifilesink0\n[>]\nparent=(GstPipeline) pipeline\nsync=FALSE\nlast-sample=((GstSample*) 0x560a143b6590)\nlocation=\"./results/x264enc/%05d.h264\"\nindex=10";
+    subgraph cluster_multifilesink0_0x560a143d0270_sink {
+      label="";
+      style="invis";
+      multifilesink0_0x560a143d0270_sink_0x560a143c28c0 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    fillcolor="#aaaaff";
+  }
+
+  subgraph cluster_x264enc0_0x560a143ca4f0 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstX264Enc\nx264enc0\n[>]\nparent=(GstPipeline) pipeline\nbitrate=128\naud=FALSE\ntrellis=FALSE\nkey-int-max=3\nspeed-preset=ultrafast\ninsert-vui=FALSE";
+    subgraph cluster_x264enc0_0x560a143ca4f0_sink {
+      label="";
+      style="invis";
+      x264enc0_0x560a143ca4f0_sink_0x560a143c2420 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    subgraph cluster_x264enc0_0x560a143ca4f0_src {
+      label="";
+      style="invis";
+      x264enc0_0x560a143ca4f0_src_0x560a143c2670 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    x264enc0_0x560a143ca4f0_sink_0x560a143c2420 -> x264enc0_0x560a143ca4f0_src_0x560a143c2670 [style="invis"];
+    fillcolor="#aaffaa";
+  }
+
+  x264enc0_0x560a143ca4f0_src_0x560a143c2670 -> capsfilter1_0x560a143da590_sink_0x560a143c2fb0 [label="video/x-h264\l       stream-format: byte-stream\l           alignment: au\l               level: 1b\l             profile: constrained-baseline\l               width: 48\l              height: 32\l  pixel-aspect-ratio: 1/1\l           framerate: 30/1\l      interlace-mode: progressive\l         colorimetry: bt601\l         chroma-site: jpeg\l      multiview-mode: mono\l     multiview-flags: 0:ffffffff:/right-view...\l"]
+  subgraph cluster_videotestsrc0_0x560a143c1870 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstVideoTestSrc\nvideotestsrc0\n[>]\nparent=(GstPipeline) pipeline\nnum-buffers=10\npattern=smpte100\nhorizontal-speed=5";
+    subgraph cluster_videotestsrc0_0x560a143c1870_src {
+      label="";
+      style="invis";
+      videotestsrc0_0x560a143c1870_src_0x560a143c21d0 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE][t]", height="0.2", style="filled,solid"];
+    }
+
+    fillcolor="#ffaaaa";
+  }
+
+  videotestsrc0_0x560a143c1870_src_0x560a143c21d0 -> capsfilter0_0x560a143da250_sink_0x560a143c2b10 [label="video/x-raw\l              format: I420\l               width: 48\l              height: 32\l           framerate: 30/1\l      multiview-mode: mono\l  pixel-aspect-ratio: 1/1\l      interlace-mode: progressive\l"]
+}

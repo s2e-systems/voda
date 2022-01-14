@@ -90,7 +90,12 @@ int main(int argc, char **argv)
 		pipeline = gst_pipeline_new("pipeline");
 		auto bus = gst_element_get_bus(pipeline);
 		auto source = gst_element_factory_make("videotestsrc", nullptr);
-		g_object_set(source, "num-buffers", number_of_frames, "horizontal-speed", 1, nullptr);
+		g_object_set(source,
+			"num-buffers", number_of_frames,
+			"horizontal-speed", 5,
+			nullptr
+		);
+		gst_util_set_object_arg(G_OBJECT(source), "pattern", "smpte100");
 		auto encoder = gst_element_factory_create(factory, nullptr);
 
 		if (candidate == "x264enc") {
@@ -117,7 +122,8 @@ int main(int argc, char **argv)
 		auto encoderSinkCaps = gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, "I420", "width", G_TYPE_INT, 48, "height", G_TYPE_INT, 32,  nullptr);
 		auto encoderSrcCaps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream", "alignment", G_TYPE_STRING, "au", nullptr);
 
-		gst_bin_add_many(GST_BIN(pipeline), source, encoder, sink, nullptr);
+		gst_bin_add_many(GST_BIN(pipeline), source, encoder, sink,  nullptr);
+
 		auto source_encoder_link_result = gst_element_link_filtered(source, encoder, encoderSinkCaps);
 		if (source_encoder_link_result == false) {
 			std::cout << "Linking source and encoder failed. Skipping.\n";
@@ -130,19 +136,15 @@ int main(int argc, char **argv)
 		}
 
 		auto set_state_result = gst_element_set_state(pipeline, GST_STATE_PAUSED);
-		if (set_state_result != GST_STATE_CHANGE_SUCCESS) {
-			if (set_state_result == GST_STATE_CHANGE_ASYNC) {
-				auto get_state_result = gst_element_get_state(pipeline, nullptr, nullptr, state_change_timeout_ns);
-				if (get_state_result != GST_STATE_CHANGE_SUCCESS) {
-					std::cout << "Waiting for GST_STATE_PAUSED timed out after " << state_change_timeout_ns/1000000 << "ms. Skipping.\n";
-					print_messages_on_bus(bus);
-					continue;
-				}
-			} else {
-				std::cout << "set_state to GST_STATE_PAUSED failed. Skipping.\n";
-				print_messages_on_bus(bus);
-				continue;
-			}
+		if (set_state_result == GST_STATE_CHANGE_FAILURE) {
+			std::cout << "set_state to GST_STATE_PAUSED failed. Skipping.\n";
+			continue;
+		};
+		auto get_state_result = gst_element_get_state(pipeline, nullptr, nullptr, state_change_timeout_ns);
+		if (get_state_result != GST_STATE_CHANGE_SUCCESS) {
+			std::cout << "Waiting for GST_STATE_PAUSED timed out after " << state_change_timeout_ns/1000000 << "ms. Skipping.\n";
+			print_messages_on_bus(bus);
+			continue;
 		}
 
 		const auto mkdir_result = g_mkdir_with_parents(resultDirectory.c_str(), 0700);
@@ -151,20 +153,17 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		auto set_state_playing_result = gst_element_set_state(pipeline, GST_STATE_PLAYING);
-		if (set_state_result != GST_STATE_CHANGE_SUCCESS) {
-			if (set_state_result == GST_STATE_CHANGE_ASYNC) {
-				auto get_state_result = gst_element_get_state(pipeline, nullptr, nullptr, state_change_timeout_ns);
-				if (get_state_result != GST_STATE_CHANGE_SUCCESS) {
-					std::cout << "Waiting for GST_STATE_PLAYING timed out after " << state_change_timeout_ns/1000000 << "ms. Skipping.\n";
-					print_messages_on_bus(bus);
-					continue;
-				}
-			} else {
-				std::cout << "set_state to GST_STATE_PLAYING failed. Skipping.\n";
-				print_messages_on_bus(bus);
-				continue;
-			}
+		const auto set_state_playing_result = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+		if (set_state_playing_result == GST_STATE_CHANGE_FAILURE) {
+			std::cout << "set_state to GST_STATE_PLAYING failed. Skipping.\n";
+			print_messages_on_bus(bus);
+			continue;
+		};
+		const auto get_state_playing_result = gst_element_get_state(pipeline, nullptr, nullptr, state_change_timeout_ns);
+		if (get_state_playing_result != GST_STATE_CHANGE_SUCCESS) {
+			std::cout << "Waiting for GST_STATE_PLAYING timed out after " << state_change_timeout_ns/1000000 << "ms. Skipping.\n";
+			print_messages_on_bus(bus);
+			continue;
 		}
 
 		std::cout << "Saving frames to: \"" << location << "\"\n";
