@@ -128,7 +128,7 @@ TEST_P(VideoDDSsubscriberTestFixture, FrameOutcome)
 						   return std::abs(a - b);
 					   });
 		const auto sum = std::accumulate(absoluteDifference.begin(), absoluteDifference.end(), 0);
-		constexpr auto max = expectedWidth * expectedHeight * 4 /*bytes per pixel*/ * 19 /* Max diff per byte */;
+		constexpr auto max = expectedWidth * expectedHeight * 4 /*bytes per pixel*/ * 15 /* Max diff per byte */;
 		EXPECT_LT(sum, max) << "Difference of frame index " << frameIndex << " too large";
 
 		gst_buffer_unmap(sampleBuffer, &mapInfo);
