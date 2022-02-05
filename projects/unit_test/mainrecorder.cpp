@@ -1,6 +1,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <sstream>
 
 #include <stdlib.h>
 #include <gst/gst.h>
@@ -54,18 +55,26 @@ int main(int argc, char **argv)
 	// x264enc aud=false bitrate=128 speed-preset=1 ! video/x-h264,stream-format=byte-stream ! multifilesink location=buffers/test%05d.264
 
 	//gst-launch-1.0 --verbose videotestsrc num-buffers=100 horizontal-speed=1 ! video/x-raw,format=I420,width=48,height=32,framerate=10/1 ! avenc_h264_omx gop-size=3 ! video/x-h264,stream-format=byte-stream ! multifilesink location=buffers/test%05d.264
+	//gst-launch-1.0 --verbose videotestsrc num-buffers=10 horizontal-speed=5 ! video/x-raw,format=I420,width=48,height=32 ! v4l2h264enc extra-controls=foo,video-bitrate=128 ! video/x-h264,stream-format=byte-stream ! multifilesink location=buffers/test%05d.264
+
+	// Convert the dot to png can be done like so:
+	// dot pipeline_graph.dot -Tpng -o pipeline_graph.png
 
 	const std::vector<std::string> candidates{"x264enc", "openh264enc", "avenc_h264_omx", "omxh264enc", "v4l2h264enc"};
 
+	const gint width = 48;
+	const gint height = 32;
 	const std::string baseDirectory = "./results";
 	const std::string filenamePattern = "%05d.h264";
+	std::ostringstream filenamePatternReference;
+	filenamePatternReference << "%05d_RGBA_w" << width << "_h" << height << ".raw";
 	const std::string graphFileBaseName = "pipeline_graph";
 	const int number_of_frames = 10;
 	const int intraInt = 3;
 	const int bitrate = 128;
 
-	const GstClockTime state_change_timeout_ns = number_of_frames * 100ull /*ms*/ * 1000000ull;
-	const GstClockTime eos_timeout_ns = number_of_frames * 100ull /*ms*/ * 1000000ull;
+	const GstClockTime state_change_timeout_ns = number_of_frames * 100ull /*ms*/ * 1'000'000ull;
+	const GstClockTime eos_timeout_ns = number_of_frames * 100ull /*ms*/ * 1'000'000ull;
 
 	GstElementFactory* factory = nullptr;
 	GstElement* pipeline = nullptr;
@@ -83,13 +92,14 @@ int main(int argc, char **argv)
 		const std::string resultDirectory = baseDirectory + '/' + candidate;
 		const std::string location = resultDirectory + '/' + filenamePattern;
 		const std::string graphFilePath = resultDirectory + '/' + graphFileBaseName;
+		const std::string locationReference = resultDirectory + '/' + filenamePatternReference.str();
 
 		if (pipeline != nullptr) {
 			gst_object_unref(pipeline);
 		}
 		pipeline = gst_pipeline_new("pipeline");
-		auto bus = gst_element_get_bus(pipeline);
-		auto source = gst_element_factory_make("videotestsrc", nullptr);
+		const auto bus = gst_element_get_bus(pipeline);
+		const auto source = gst_element_factory_make("videotestsrc", nullptr);
 		g_object_set(source,
 			"num-buffers", number_of_frames,
 			"horizontal-speed", 5,
@@ -112,37 +122,75 @@ int main(int argc, char **argv)
 		}
 		if (candidate == "v4l2h264enc")
 		{
-			std::cout << "Element: \""<< candidate << " must be still implemented! Skipping\n";
-			continue;
-			// TODO.
+ 			auto extra = gst_structure_new("recorder", "video_bitrate", G_TYPE_INT, bitrate, nullptr);
+			g_object_set(encoder, "extra-controls", extra, nullptr);
 		}
-		auto sink = gst_element_factory_make("multifilesink", nullptr);
+		const auto sink = gst_element_factory_make("multifilesink", nullptr);
 		g_object_set(sink, "location", location.c_str(), nullptr);
 
-		auto encoderSinkCaps = gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, "I420", "width", G_TYPE_INT, 48, "height", G_TYPE_INT, 32,  nullptr);
-		auto encoderSrcCaps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream", "alignment", G_TYPE_STRING, "au", nullptr);
+		const auto encoderSinkCaps = gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, "I420", "width", G_TYPE_INT, width, "height", G_TYPE_INT, height,  nullptr);
+		const auto encoderSrcCaps = gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream", "alignment", G_TYPE_STRING, "au", nullptr);
 
-		gst_bin_add_many(GST_BIN(pipeline), source, encoder, sink,  nullptr);
+		const auto tee = gst_element_factory_make("tee", nullptr);
+		const auto queue0 = gst_element_factory_make("queue", nullptr);
+		const auto queue1 = gst_element_factory_make("queue", nullptr);
+		const auto converter = gst_element_factory_make("videoconvert", nullptr);
+		const auto sinkReferenceCaps = gst_caps_new_simple("video/x-raw",
+			"format", G_TYPE_STRING, "RGBA",
+			nullptr
+		);
+		const auto sinkReference = gst_element_factory_make("multifilesink", nullptr);
+		g_object_set(sinkReference, "location", locationReference.c_str(), nullptr);
 
-		auto source_encoder_link_result = gst_element_link_filtered(source, encoder, encoderSinkCaps);
-		if (source_encoder_link_result == false) {
-			std::cout << "Linking source and encoder failed. Skipping.\n";
+		gst_bin_add_many(GST_BIN(pipeline), source, tee, nullptr);
+		gst_bin_add_many(GST_BIN(pipeline), queue0, encoder, sink, nullptr);
+		gst_bin_add_many(GST_BIN(pipeline), queue1, converter, sinkReference, nullptr);
+
+		const auto source_tee_link_result = gst_element_link_filtered(source, tee, encoderSinkCaps);
+		if (source_tee_link_result == false) {
+			std::cout << "Linking source and tee failed. Skipping.\n";
 			continue;
 		}
-		auto encoder_sink_link_result = gst_element_link_filtered(encoder, sink, encoderSrcCaps);
+		const auto tee_queue0_link_result = gst_element_link_pads(tee, "src_0", queue0, "sink");
+		if (tee_queue0_link_result == false) {
+			std::cout << "Linking tee and queue0 failed. Skipping.\n";
+			continue;
+		}
+		const auto queue0_encoder_link_result = gst_element_link(queue0, encoder);
+		if (queue0_encoder_link_result == false) {
+			std::cout << "Linking queue0 and encoder failed. Skipping.\n";
+			continue;
+		}
+		const auto encoder_sink_link_result = gst_element_link_filtered(encoder, sink, encoderSrcCaps);
 		if (encoder_sink_link_result == false) {
 			std::cout << "Linking encoder sink failed. Skipping.\n";
 			continue;
 		}
+		const auto tee_queue1_link_result = gst_element_link_pads(tee, "src_1", queue1, "sink");
+		if (tee_queue1_link_result == false) {
+			std::cout << "Linking tee and queue1 failed. Skipping.\n";
+			continue;
+		}
+		const auto queue1_converter_link_result = gst_element_link(queue1, converter);
+		if (queue1_converter_link_result == false) {
+			std::cout << "Linking queue1 and converter failed. Skipping.\n";
+			continue;
+		}
+		const auto converter_sinkReference_result = gst_element_link_filtered(converter, sinkReference, sinkReferenceCaps);
+		if (converter_sinkReference_result == false) {
+			std::cout << "Linking converter and sinkReference failed. Skipping.\n";
+			continue;
+		}
 
-		auto set_state_result = gst_element_set_state(pipeline, GST_STATE_PAUSED);
+		const auto set_state_result = gst_element_set_state(pipeline, GST_STATE_PAUSED);
 		if (set_state_result == GST_STATE_CHANGE_FAILURE) {
 			std::cout << "set_state to GST_STATE_PAUSED failed. Skipping.\n";
+			print_messages_on_bus(bus);
 			continue;
 		};
-		auto get_state_result = gst_element_get_state(pipeline, nullptr, nullptr, state_change_timeout_ns);
+		const auto get_state_result = gst_element_get_state(pipeline, nullptr, nullptr, state_change_timeout_ns);
 		if (get_state_result != GST_STATE_CHANGE_SUCCESS) {
-			std::cout << "Waiting for GST_STATE_PAUSED timed out after " << state_change_timeout_ns/1000000 << "ms. Skipping.\n";
+			std::cout << "Waiting for GST_STATE_PAUSED timed out after " << state_change_timeout_ns/1'000'000 << "ms. Skipping.\n";
 			print_messages_on_bus(bus);
 			continue;
 		}
@@ -161,7 +209,7 @@ int main(int argc, char **argv)
 		};
 		const auto get_state_playing_result = gst_element_get_state(pipeline, nullptr, nullptr, state_change_timeout_ns);
 		if (get_state_playing_result != GST_STATE_CHANGE_SUCCESS) {
-			std::cout << "Waiting for GST_STATE_PLAYING timed out after " << state_change_timeout_ns/1000000 << "ms. Skipping.\n";
+			std::cout << "Waiting for GST_STATE_PLAYING timed out after " << state_change_timeout_ns/1'000'000 << "ms. Skipping.\n";
 			print_messages_on_bus(bus);
 			continue;
 		}
@@ -171,7 +219,7 @@ int main(int argc, char **argv)
 		std::cout << "Waiting for finish (EOS)\n";
 		const auto eos_return = gst_bus_timed_pop_filtered(bus, eos_timeout_ns, GST_MESSAGE_EOS);
 		if (eos_return == nullptr) {
-			std::cout << "Timout oocured while waiting for eos after " << eos_timeout_ns/1000000 << "ms\n";
+			std::cout << "Timeout oocured while waiting for EOS after " << eos_timeout_ns/1'000'000 << "ms\n";
 		} else {
 			std::cout << "Finished (got EOS)\n";
 		}
