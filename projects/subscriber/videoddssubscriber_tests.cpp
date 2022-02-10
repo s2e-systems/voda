@@ -18,11 +18,11 @@ INSTANTIATE_TEST_SUITE_P(
 	VideoDDSsubscriberTests,
 	VideoDDSsubscriberTestFixture,
 	::testing::Values(
-		std::make_pair("windows_gst1_18_5", "openh264enc"),
-		std::make_pair("windows_gst1_18_5", "x264enc"),
-		std::make_pair("ubuntu_gst1_16_2", "x264enc")
-	)
-);
+		std::make_pair("raspbian_gst1_18", "v4l2h264enc"),
+		std::make_pair("raspbian_gst1_18", "x264enc"),
+		std::make_pair("windows_gst1_18", "openh264enc"),
+		std::make_pair("windows_gst1_18", "x264enc"),
+		std::make_pair("ubuntu_gst1_16", "x264enc")));
 
 TEST_P(VideoDDSsubscriberTestFixture, FrameOutcome)
 {
@@ -30,8 +30,8 @@ TEST_P(VideoDDSsubscriberTestFixture, FrameOutcome)
 	const std::string encoderDirectory = std::get<0>(encoder);
 	const std::string encoderName = std::get<1>(encoder);
 
-	constexpr auto expectedWidth = 48;
-	constexpr auto expectedHeight = 32;
+	constexpr int expectedWidth = 112;
+	constexpr int expectedHeight = 32;
 
 	VideoDDSsubscriber v{false};
 
@@ -70,7 +70,7 @@ TEST_P(VideoDDSsubscriberTestFixture, FrameOutcome)
 		const auto ret = gst_app_src_push_buffer(v.ddsAppSrc(), gstBuffer);
 		if (ret != GST_FLOW_OK)
 		{
-			FAIL() << "Something went wrong while injecting fram data into the pipeline";
+			FAIL() << "Something went wrong while injecting frame data into the pipeline";
 		}
 	}
 
@@ -78,10 +78,9 @@ TEST_P(VideoDDSsubscriberTestFixture, FrameOutcome)
 
 	//////////////  Pull from pipeline
 
-	auto frameIndex = 0;
-	for (; frameIndex < numberOfSamples; ++frameIndex)
+	for (auto frameIndex = 0; frameIndex < numberOfSamples; ++frameIndex)
 	{
-		const auto frame = gst_app_sink_try_pull_sample(v.displayAppSink(), 3000000000 /*timeout ns*/);
+		const auto frame = gst_app_sink_try_pull_sample(v.displayAppSink(), 3'000'000'000 /*timeout ns*/);
 		EXPECT_NE(frame, nullptr) << "gst_app_sink_try_pull_sample failed after timeout on frame index " << frameIndex;
 
 		const auto caps = gst_sample_get_caps(frame);
@@ -103,8 +102,15 @@ TEST_P(VideoDDSsubscriberTestFixture, FrameOutcome)
 		auto dataResult = const_cast<const uint8_t *>(mapInfo.data);
 		const auto lengthResult = static_cast<int>(mapInfo.size);
 
+		std::ostringstream outFileName;
+		outFileName << "decoded" << std::setfill('0') << std::setw(5) << frameIndex << ".rgba.raw";
+		auto wf = std::ofstream{outFileName.str(), std::ios::out | std::ios::binary};
+		wf.write(reinterpret_cast<const char *>(mapInfo.data), lengthResult);
+		wf.close();
+
 		std::ostringstream expectedSampleFileName;
-		expectedSampleFileName << "ref" << std::setfill('0') << std::setw(5) << frameIndex << ".rgba.raw";
+		expectedSampleFileName << std::setfill('0') << std::setw(5) << frameIndex << std::setw(0);
+		expectedSampleFileName << "_RGBA_w" << expectedWidth << "_h" << expectedHeight << ".raw";
 		const auto expectedSampleFilePath = unitTestDataDirectory / expectedSampleFileName.str();
 		const auto lengthExpected = std::filesystem::file_size(expectedSampleFilePath);
 		EXPECT_EQ(lengthResult, lengthExpected) << "Length of expected and result not equal of frame index " << frameIndex;
@@ -112,21 +118,13 @@ TEST_P(VideoDDSsubscriberTestFixture, FrameOutcome)
 		std::istream_iterator<uint8_t> start(expectedFile), end;
 		const std::vector<uint8_t> expectedData{start, end};
 
-		std::ostringstream outFileName;
-		outFileName << "img" << std::setfill('0') << std::setw(5) << frameIndex << ".rgba.raw";
-		auto wf = std::ofstream{outFileName.str(), std::ios::out | std::ios::binary};
-		wf.write(reinterpret_cast<const char *>(mapInfo.data), lengthResult);
-		wf.close();
-
 		const std::vector<uint8_t> resultData{&dataResult[0], &dataResult[lengthResult]};
 		EXPECT_EQ(resultData.size(), expectedData.size()) << "Byte size of expected and result not equal of frame index " << frameIndex;
 
 		std::vector<int16_t> absoluteDifference(lengthResult);
 		std::transform(resultData.begin(), resultData.end(), expectedData.begin(), absoluteDifference.begin(),
 					   [](int16_t a, int16_t b)
-					   {
-						   return std::abs(a - b);
-					   });
+					   { return std::abs(a - b); });
 		const auto sum = std::accumulate(absoluteDifference.begin(), absoluteDifference.end(), 0);
 		constexpr auto max = expectedWidth * expectedHeight * 4 /*bytes per pixel*/ * 15 /* Max diff per byte */;
 		EXPECT_LT(sum, max) << "Difference of frame index " << frameIndex << " too large";

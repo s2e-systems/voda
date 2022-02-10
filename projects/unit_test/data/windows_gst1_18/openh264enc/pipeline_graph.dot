@@ -1,0 +1,118 @@
+digraph pipeline {
+  rankdir=LR;
+  fontname="sans";
+  fontsize="10";
+  labelloc=t;
+  nodesep=.1;
+  ranksep=.2;
+  label="<GstPipeline>\npipeline\n[>]";
+  node [style="filled,rounded", shape=box, fontsize="9", fontname="sans", margin="0.0,0.0"];
+  edge [labelfontsize="6", fontsize="9", fontname="monospace"];
+  
+  legend [
+    pos="0,0!",
+    margin="0.05,0.05",
+    style="filled",
+    label="Legend\lElement-States: [~] void-pending, [0] null, [-] ready, [=] paused, [>] playing\lPad-Activation: [-] none, [>] push, [<] pull\lPad-Flags: [b]locked, [f]lushing, [b]locking, [E]OS; upper-case is set\lPad-Task: [T] has started task, [t] has paused task\l",
+  ];
+  subgraph cluster_capsfilter5_000002136F9116B0 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstCapsFilter\ncapsfilter5\n[>]\ncaps=video/x-h264, stream-format=(string)byte-stream, alignment=(string)au";
+    subgraph cluster_capsfilter5_000002136F9116B0_sink {
+      label="";
+      style="invis";
+      capsfilter5_000002136F9116B0_sink_000002136F867500 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    subgraph cluster_capsfilter5_000002136F9116B0_src {
+      label="";
+      style="invis";
+      capsfilter5_000002136F9116B0_src_000002136F867750 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    capsfilter5_000002136F9116B0_sink_000002136F867500 -> capsfilter5_000002136F9116B0_src_000002136F867750 [style="invis"];
+    fillcolor="#aaffaa";
+  }
+
+  capsfilter5_000002136F9116B0_src_000002136F867750 -> multifilesink2_000002136F859A50_sink_000002136F869EA0 [label="video/x-h264\l       stream-format: byte-stream\l           alignment: au\l             profile: baseline\l               width: 112\l              height: 32\l  pixel-aspect-ratio: 1/1\l           framerate: 30/1\l      interlace-mode: progressive\l         colorimetry: bt601\l         chroma-site: jpeg\l      multiview-mode: mono\l     multiview-flags: 0:ffffffff:/right-view...\l"]
+  subgraph cluster_capsfilter4_000002136F915B70 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstCapsFilter\ncapsfilter4\n[>]\ncaps=video/x-raw, format=(string)I420, width=(int)112, height=(int)32";
+    subgraph cluster_capsfilter4_000002136F915B70_sink {
+      label="";
+      style="invis";
+      capsfilter4_000002136F915B70_sink_000002136F869A00 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    subgraph cluster_capsfilter4_000002136F915B70_src {
+      label="";
+      style="invis";
+      capsfilter4_000002136F915B70_src_000002136F869560 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    capsfilter4_000002136F915B70_sink_000002136F869A00 -> capsfilter4_000002136F915B70_src_000002136F869560 [style="invis"];
+    fillcolor="#aaffaa";
+  }
+
+  capsfilter4_000002136F915B70_src_000002136F869560 -> openh264enc0_000002136F915750_sink_000002136F86AA30 [label="video/x-raw\l              format: I420\l               width: 112\l              height: 32\l           framerate: 30/1\l      multiview-mode: mono\l  pixel-aspect-ratio: 1/1\l      interlace-mode: progressive\l"]
+  subgraph cluster_multifilesink2_000002136F859A50 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstMultiFileSink\nmultifilesink2\n[>]\nsync=FALSE\nlast-sample=((GstSample*) 000002136F7E7620)\nlocation=\"./results/openh264enc/%05d.h264\"\nindex=10";
+    subgraph cluster_multifilesink2_000002136F859A50_sink {
+      label="";
+      style="invis";
+      multifilesink2_000002136F859A50_sink_000002136F869EA0 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    fillcolor="#aaaaff";
+  }
+
+  subgraph cluster_openh264enc0_000002136F915750 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstOpenh264Enc\nopenh264enc0\n[>]\ngop-size=3\nrate-control=bitrate";
+    subgraph cluster_openh264enc0_000002136F915750_sink {
+      label="";
+      style="invis";
+      openh264enc0_000002136F915750_sink_000002136F86AA30 [color=black, fillcolor="#aaaaff", label="sink\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    subgraph cluster_openh264enc0_000002136F915750_src {
+      label="";
+      style="invis";
+      openh264enc0_000002136F915750_src_000002136F8672B0 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE]", height="0.2", style="filled,solid"];
+    }
+
+    openh264enc0_000002136F915750_sink_000002136F86AA30 -> openh264enc0_000002136F915750_src_000002136F8672B0 [style="invis"];
+    fillcolor="#aaffaa";
+  }
+
+  openh264enc0_000002136F915750_src_000002136F8672B0 -> capsfilter5_000002136F9116B0_sink_000002136F867500 [label="video/x-h264\l       stream-format: byte-stream\l           alignment: au\l             profile: baseline\l               width: 112\l              height: 32\l  pixel-aspect-ratio: 1/1\l           framerate: 30/1\l      interlace-mode: progressive\l         colorimetry: bt601\l         chroma-site: jpeg\l      multiview-mode: mono\l     multiview-flags: 0:ffffffff:/right-view...\l"]
+  subgraph cluster_videotestsrc2_000002136F801900 {
+    fontname="Bitstream Vera Sans";
+    fontsize="8";
+    style="filled,rounded";
+    color=black;
+    label="GstVideoTestSrc\nvideotestsrc2\n[>]\nnum-buffers=10\npattern=smpte100\nhorizontal-speed=6";
+    subgraph cluster_videotestsrc2_000002136F801900_src {
+      label="";
+      style="invis";
+      videotestsrc2_000002136F801900_src_000002136F867060 [color=black, fillcolor="#ffaaaa", label="src\n[>][bfbE][t]", height="0.2", style="filled,solid"];
+    }
+
+    fillcolor="#ffaaaa";
+  }
+
+  videotestsrc2_000002136F801900_src_000002136F867060 -> capsfilter4_000002136F915B70_sink_000002136F869A00 [label="video/x-raw\l              format: I420\l               width: 112\l              height: 32\l           framerate: 30/1\l      multiview-mode: mono\l  pixel-aspect-ratio: 1/1\l      interlace-mode: progressive\l"]
+}
