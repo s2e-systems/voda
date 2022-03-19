@@ -14,14 +14,10 @@
 
 #include "videoddspublisher.h"
 
-#include <QDebug>
-#include <QSize>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "qtgstreamer.h"
-#include "videowidgetpaintergst.h"
 #include "elements.h"
 #include "cameracapabilities.h"
 
@@ -30,7 +26,6 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 	auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video>* >(userData);
 	if (dataWriter == nullptr || dataWriter->is_nil())
 	{
-		qCritical() << "Data writer for dds app sink not valid";
 		return GST_FLOW_ERROR;
 	}
 
@@ -51,19 +46,11 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 			gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
 
 			const auto byteCount = int(mapInfo.size);
-			auto rawData = static_cast<uint8_t* >(mapInfo.data);
-			const std::vector<uint8_t> frame(rawData, rawData + byteCount);
-			const S2E::Video sample(userid, frameNum, frame);
-			*dataWriter << sample;
+			const auto rawData = static_cast<uint8_t* >(mapInfo.data);
+			const dds::core::ByteSeq frame{rawData, rawData + byteCount};
+			*dataWriter << S2E::Video{userid, frameNum, frame};
 			gst_buffer_unmap(sampleBuffer, &mapInfo);
-
-			qDebug() << "Send DDS msg" << frameNum << "with size of" << byteCount << "Bytes";
-
 		}
-		// The S2E::Video sample and the std::vector<uint8_t> frame are destroyed here.
-		// How ever the DDS system takes care that the necessary data stays alive.
-		// As such some data is compied around here.
-		// TODO: the copying may be avoided by using other function.
 		gst_sample_unref(sample);
 	}
 
@@ -73,10 +60,9 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 VideoDDSpublisher::~VideoDDSpublisher()
 {
 	auto bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
-	auto pipelineStartSucess = gst_element_set_state(m_pipeline, GST_STATE_NULL);
-	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
+	auto pipelineStartSuccess = gst_element_set_state(m_pipeline, GST_STATE_NULL);
+	if (pipelineStartSuccess == GST_STATE_CHANGE_FAILURE)
 	{
-		qWarning() << "Set pipeline to null failed";
 		gst_bus_set_flushing(bus, true);
 	}
 	// Switch off emitting of signals by the dds appsink. This
@@ -98,26 +84,24 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	// or on Linux:
 	// gst-launch-1.0 --gst-debug=*src:5 v4l2src num-buffers=1 ! fakesink
 
-	std::vector<std::string> sourceCanditates;
+	std::vector<std::string> sourceCandidates;
 	if (!useTestSrc)
 	{
-		sourceCanditates.push_back("ksvideosrc");
-		sourceCanditates.push_back("v4l2src");
+		sourceCandidates.push_back("ksvideosrc");
+		sourceCandidates.push_back("v4l2src");
 	}
-	sourceCanditates.push_back("videotestsrc");
+	sourceCandidates.push_back("videotestsrc");
 
-	ElementSelection sourceSelection{sourceCanditates, "source"};
-	qDebug() << "selected source element: " << QString::fromStdString(sourceSelection.elementName());
+	ElementSelection sourceSelection{sourceCandidates, "source"};
 
 	gst_element_set_state(sourceSelection.element(), GST_STATE_READY);
 	gst_element_get_state(sourceSelection.element(), nullptr /*state*/, nullptr /*pending*/, GST_CLOCK_TIME_NONE);
-	auto caps = gst_pad_query_caps(gst_element_get_static_pad(sourceSelection.element(), "src"), nullptr);
+	const auto caps = gst_pad_query_caps(gst_element_get_static_pad(sourceSelection.element(), "src"), nullptr);
 
 	GstCaps *capsFilter = nullptr;
 
 	if (useFixedCaps)
 	{
-		qDebug() << "Using fixed capabilities";
 		capsFilter = gst_caps_new_simple("video/x-raw",
 										 "width", G_TYPE_INT, 640,
 										 "height", G_TYPE_INT, 480,
@@ -127,7 +111,6 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	else
 	if (useTestSrc || sourceSelection.elementName() == "videotestsrc")
 	{
-		qDebug() << "Using fixed capabilities for test source";
 		capsFilter = gst_caps_new_simple("video/x-raw",
 										 "format", G_TYPE_STRING, "I420",
 										 "width", G_TYPE_INT, 640,
@@ -139,10 +122,8 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	{
 		CapabilitySelection capsSelection{caps};
 		const auto framerate = capsSelection.highestRawFrameRate();
-		qDebug() << "Detected highest framerate as:" << framerate << "and use this to determine highest pixel area";
 		capsFilter = capsSelection.highestRawArea(framerate);
 	}
-	qDebug() << "Usiing following capabilities for the source element:" << gst_caps_to_string(capsFilter);
 
 	auto sourceBin = GST_BIN_CAST(gst_bin_new("sourceBin"));
 	gst_bin_add(sourceBin, sourceSelection.element());
@@ -162,10 +143,10 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	//////////////
 	// DDS
 
-	auto encodereBin = GST_BIN_CAST(gst_bin_new("encodereBin"));
+	auto encoderBin = GST_BIN_CAST(gst_bin_new("encoderBin"));
 
 	auto ddsAppSink  = gst_element_factory_make("appsink", "ddsAppSink");
-	gst_bin_add(encodereBin, ddsAppSink);
+	gst_bin_add(encoderBin, ddsAppSink);
 	auto ddsSinkCaps = gst_caps_new_simple("video/x-h264",
 		"stream-format", G_TYPE_STRING, "byte-stream",
 		"alignment", G_TYPE_STRING, "au",
@@ -202,7 +183,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	const int kilobitrate = 1280;
 	const int keyframedistance = 30;
 
-	gst_bin_add(encodereBin, encoder);
+	gst_bin_add(encoderBin, encoder);
 	if (encoderName == "avenc_h264_omx")
 	{
 		g_object_set(encoder,
@@ -214,7 +195,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 		// the parser will do so
 		auto parser = gst_element_factory_make("h264parse", nullptr);
 		g_object_set(parser, "config-interval", gint(-1), nullptr);
-		gst_bin_add(encodereBin, parser);
+		gst_bin_add(encoderBin, parser);
 		gst_element_link(encoder, parser);
 		gst_element_link(parser, ddsAppSink);
 	}
@@ -240,10 +221,8 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 		throw std::runtime_error("Encoder not valid");
 	}
 
-
-
-	auto padFirstEncoder = gst_element_get_static_pad(encoder, "sink");
-	gst_element_add_pad(GST_ELEMENT_CAST(encodereBin), gst_ghost_pad_new("sink", padFirstEncoder));
+	const auto padFirstEncoder = gst_element_get_static_pad(encoder, "sink");
+	gst_element_add_pad(GST_ELEMENT_CAST(encoderBin), gst_ghost_pad_new("sink", padFirstEncoder));
 	gst_object_unref(GST_OBJECT(padFirstEncoder));
 
 	g_signal_connect(ddsAppSink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
@@ -270,7 +249,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	);
 	gst_element_link(displayConverter, appSink);
 
-	auto padFirstDisplay = gst_element_get_static_pad(displayConverter, "sink");
+	const auto padFirstDisplay = gst_element_get_static_pad(displayConverter, "sink");
 	gst_element_add_pad(GST_ELEMENT_CAST(displayBin), gst_ghost_pad_new("sink", padFirstDisplay));
 	gst_object_unref(GST_OBJECT(padFirstDisplay));
 
@@ -278,37 +257,33 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	// Create pipeline and bring the bins together
 
 	m_pipeline = gst_pipeline_new("publisher");
-	auto bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
-	gst_bus_set_sync_handler(bus, QtGStreamer::busCallBack /*function*/, nullptr /*user_data*/, nullptr /*notify function*/);
-	gst_object_unref(bus);
 
-	auto tee = gst_element_factory_make("tee", nullptr);
-	auto queue0 = gst_element_factory_make("queue", nullptr);
-	auto queue1 = gst_element_factory_make("queue", nullptr);
+	const auto tee = gst_element_factory_make("tee", nullptr);
+	const auto queue0 = gst_element_factory_make("queue", nullptr);
+	const auto queue1 = gst_element_factory_make("queue", nullptr);
 
 	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(sourceBin));
 	gst_bin_add(GST_BIN_CAST(m_pipeline), tee);
 	gst_bin_add(GST_BIN_CAST(m_pipeline), queue0);
 	gst_bin_add(GST_BIN_CAST(m_pipeline), queue1);
-	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(encodereBin));
+	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(encoderBin));
 	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(displayBin));
 
 	auto boolret = gst_element_link(GST_ELEMENT_CAST(sourceBin), tee);
-	boolret &= gst_element_link(queue0, GST_ELEMENT_CAST(encodereBin));
+	boolret &= gst_element_link(queue0, GST_ELEMENT_CAST(encoderBin));
 	boolret &= gst_element_link(queue1, GST_ELEMENT_CAST(displayBin));
 	boolret &= gst_element_link_pads(tee, "src_0", queue0, "sink");
 	boolret &= gst_element_link_pads(tee, "src_1", queue1, "sink");
 
 	if (boolret != gboolean(true))
 	{
-		qWarning() << "Linking pipeline failed!";
+		throw std::runtime_error("Linking pipeline failed");
 	}
 
-	auto pipelineStartSucess = gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
-	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
+	auto pipelineStartSuccess = gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
+	if (pipelineStartSuccess == GST_STATE_CHANGE_FAILURE)
 	{
-		qWarning() << "Set pipeline to playing failed";
-		gst_bus_set_flushing(bus, true);
+		throw std::runtime_error("Linking pipeline failed");
 	}
 }
 
