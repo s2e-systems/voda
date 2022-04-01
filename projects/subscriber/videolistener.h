@@ -44,12 +44,6 @@ public:
 	VideoListener(GstAppSrc* const appSrc);
 
 private:
-	/**
-	 * Only prints an info that a deadline was missed.
-	 */
-	virtual void on_requested_deadline_missed(
-		dds::sub::DataReader<S2E::Video>& the_reader,
-		const dds::core::status::RequestedDeadlineMissedStatus& status);
 
 	/**
 	 * Takes data from the DDS and copies it into the GStreamer appsrc.

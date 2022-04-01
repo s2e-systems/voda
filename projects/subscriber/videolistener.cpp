@@ -14,9 +14,7 @@
 
 #include "videolistener.h"
 
-#include <QDebug>
 #include <cstring>
-#include <vector>
 #include <stdexcept>
 
 VideoListener::VideoListener(GstAppSrc* const appSrc) :
@@ -28,34 +26,17 @@ VideoListener::VideoListener(GstAppSrc* const appSrc) :
 	}
 }
 
-
-void VideoListener::on_requested_deadline_missed(
-	dds::sub::DataReader<S2E::Video>&,
-	const dds::core::status::RequestedDeadlineMissedStatus&)
-{
-	qDebug() << "on_requested_deadline_missed";
-}
-
 void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 {
-	Q_UNUSED(reader)
-
 	//Check if the GStreamer pipeline is running, by checking the state of the appsrc
 	GstState appSrcState = GST_STATE_NULL;
 	gst_element_get_state(GST_ELEMENT(m_appSrc), &appSrcState, nullptr /*pending*/, 10/*timeout nanosec*/);
 	if (appSrcState != GST_STATE_PLAYING && appSrcState != GST_STATE_PAUSED && appSrcState != GST_STATE_READY)
 	{
-		qDebug() << "Pipeline not running" << appSrcState;
 		return;
 	}
 
-	// Read the samples that came in by DDS and check its validity.
 	const auto samples = reader.take();
-	if (samples.length() < 1)
-	{
-		qDebug() << "on_data_available triggered but not sample available";
-		return;
-	}
 
 	// It may happen that multiple samples came in in one go, in that
 	// case all the samples are pushed into the GStreamer pipeline.
@@ -63,27 +44,11 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 	{
 		if(sample.info().valid() == false)
 		{
-			qDebug() << "Sample is not valid";
 			continue;
 		}
 		const auto& frame = sample.data().frame();
 		const auto rawDataPtr = reinterpret_cast<const void *>(frame.data());
 		const auto byteCount = static_cast<const gsize>(sample.data().frame().size());
-
-		// The following lines might be used to enable data handling without copying
-		// the arrived data.
-		// Note however that it is very difficult to prevent the samples going out of
-		// this function scope. There is no facility in the DataReader that would
-		// support such thing (e.g. ref() or retain() does not exist for the samples).
-		//
-		//gstBuffer = gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_LAST /*flags*/,
-		//			rawDataPtr /*data*/, byteCount /*maxsize*/, 0 /*offset*/, byteCount /*size*/,
-		//		(gpointer)NULL/*user_data*/, &VideoListener::gstBufferDestroyCallBack);
-		//
-		// Another way of implementing a zero copy would be a custom allocator for the
-		// gst_buffer_new_allocate function. In that custom allocator may then the allo function
-		// do not really allocate the memory but rather keep the sample alive. And in the free
-		// function release the samples.
 
 		// Copy the arrived memory from the DDS into a GStreamer buffer
 		GstMapInfo mapInfo;
@@ -96,21 +61,7 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 		const auto ret = gst_app_src_push_buffer(m_appSrc, gstBuffer);
 		if (ret != GST_FLOW_OK)
 		{
-			qWarning() << "Something went wrong while injecting fram data into the display pipeline";
-			// TODO: If copy-free method is used, here the data should be freed as well
+			return;
 		}
-
-		// Get the buffer fill to check how many video samples have arrived and are not processed.
-		// The app src does unfortunetly not have a sample count.
-		guint64 bufferFill;
-		g_object_get(m_appSrc, "current-level-bytes", &bufferFill, NULL);
-		qDebug() << "Received frameNum:" << sample->data().frameNum() << "with size" << byteCount
-				 << " appsrc buffer:" << bufferFill;
 	}
-}
-
-void VideoListener::gstBufferDestroyCallBack(gpointer data)
-{
-	Q_UNUSED(data)
-	//TODO: If copy-free method is used, Do whats neccessary to realease memory in DDS
 }
