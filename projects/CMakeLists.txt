@@ -20,8 +20,6 @@ add_executable(VideoDDSSubscriber
 	subscriber/videoddssubscriber.cpp
 	subscriber/videolistener.h
 	subscriber/videolistener.cpp
-	common/qtgstreamer.h
-	common/qtgstreamer.cpp
 	common/videowidgetpaintergst.h
 	common/videowidgetpaintergst.cpp
 )
@@ -47,8 +45,6 @@ add_executable(VideoDDSPublisher
 	publisher/main.cpp
 	publisher/videoddspublisher.h
 	publisher/videoddspublisher.cpp
-	common/qtgstreamer.h
-	common/qtgstreamer.cpp
 	common/videowidgetpaintergst.h
 	common/videowidgetpaintergst.cpp
 	common/cameracapabilities.h

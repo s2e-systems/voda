@@ -21,7 +21,6 @@
 
 #include "videoddspublisher.h"
 #include "videowidgetpaintergst.h"
-#include "qtgstreamer.h"
 
 #include "dds/dds.hpp"
 #include "VideoDDS.hpp"
