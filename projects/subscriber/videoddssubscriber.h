@@ -28,8 +28,8 @@ public:
 	/**
 	 */
 	VideoDDSsubscriber(bool useOmx);
-	GstAppSink* displayAppSink();
-	GstAppSrc* ddsAppSrc();
+	GstAppSink* displayAppSink() const;
+	GstAppSrc* ddsAppSrc() const;
 
 private:
 

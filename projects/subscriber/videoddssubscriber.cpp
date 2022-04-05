@@ -85,11 +85,11 @@ VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 	}
 }
 
-GstAppSink* VideoDDSsubscriber::displayAppSink()
+GstAppSink* VideoDDSsubscriber::displayAppSink() const
 {
 	return GST_APP_SINK_CAST(m_displayAppSink);
 }
-GstAppSrc* VideoDDSsubscriber::ddsAppSrc()
+GstAppSrc* VideoDDSsubscriber::ddsAppSrc() const
 {
 	return GST_APP_SRC_CAST(m_ddsAppSrc);
 }

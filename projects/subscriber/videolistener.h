@@ -15,11 +15,11 @@
 #ifndef VIDEOLISTENER_H
 #define VIDEOLISTENER_H
 
-#include <QObject>
 #include <gst/app/gstappsrc.h>
 
 #include "dds/dds.hpp"
 #include "VideoDDS.hpp"
+
 using namespace org::eclipse::cyclonedds;
 
 /**
