@@ -39,14 +39,13 @@ int main(int argc, char *argv[])
 	try
 	{
 		GError* error = nullptr;
-		GOptionContext* context;
 
 		gboolean use_testsrc = FALSE;
 		gboolean use_omx = FALSE;
 		gboolean use_fixed = FALSE;
 		gint strength = 1000;
 
-		static GOptionEntry entries[] =
+		GOptionEntry entries[] =
 		{
 			{"testsrc", 't', 0, G_OPTION_ARG_NONE, &use_testsrc, "Use test src instead of camera", nullptr},
 			{"omx", 'o', 0, G_OPTION_ARG_NONE, &use_omx, "Use omx as the encoder", nullptr},
@@ -61,16 +60,16 @@ int main(int argc, char *argv[])
 			g_error_free(error);
 			throw std::runtime_error{error_message};
 		}
-		context = g_option_context_new("[APPLICATION OPTIONS]");
-		g_option_context_add_main_entries(context, entries, nullptr);
-		g_option_context_add_group(context, gst_init_get_option_group());
-		if (!g_option_context_parse(context, &argc, &argv, &error))
+		GOptionContext* option_context = g_option_context_new("[APPLICATION OPTIONS]");
+		g_option_context_add_main_entries(option_context, entries, nullptr);
+		g_option_context_add_group(option_context, gst_init_get_option_group());
+		if (!g_option_context_parse(option_context, &argc, &argv, &error))
 		{
 			const auto error_message = std::string{error->message};
 			g_error_free(error);
 			throw std::runtime_error{error_message};
 		}
-		g_option_context_free(context);
+		g_option_context_free(option_context);
 
 		const std::string topicName = "VideoStream";
 
