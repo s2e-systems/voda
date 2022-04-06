@@ -31,6 +31,9 @@ int main(int argc, char *argv[])
 {
 	try
 	{
+		QApplication application(argc, argv);
+		application.setApplicationName("Video DDS Publisher");
+
 		GError* error = nullptr;
 
 		gboolean use_testsrc = FALSE;
@@ -89,8 +92,6 @@ int main(int argc, char *argv[])
 
 		VideoDDSpublisher videoPublisher{dataWriter, bool(use_testsrc), bool(use_omx), bool(use_fixed)};
 
-		QApplication application(argc, argv);
-		application.setApplicationName("Video DDS Publisher");
 
 		VideoWidgetPainterGst widget(videoPublisher.appsink());
 		widget.show();
