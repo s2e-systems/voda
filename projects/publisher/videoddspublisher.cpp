@@ -117,6 +117,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 										 "height", G_TYPE_INT, 480,
 										 "framerate", GST_TYPE_FRACTION, 30, 1,
 										 nullptr);
+		g_object_set(sourceSelection.element(), "horizontal-speed", 5, nullptr);
 	}
 	else
 	{
@@ -233,7 +234,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 
 	auto displayBin = GST_BIN_CAST(gst_bin_new("displayBin"));
 	auto displayConverter = gst_element_factory_make("videoconvert", nullptr);
-	auto appSink = gst_element_factory_make("appsink", "displayAppSink");
+	auto appSink = gst_element_factory_make("glimagesink", "displayAppSink");
 	gst_bin_add(displayBin, displayConverter);
 	gst_bin_add(displayBin, appSink);
 	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
@@ -241,9 +242,9 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 		nullptr
 	);
 	g_object_set(appSink,
-		"caps", displaySinkCaps,
-		"max-buffers", 1,
-		"drop", true,
+		// "caps", displaySinkCaps,
+		// "max-buffers", 1,
+		// "drop", true,
 		"sync", false,
 		nullptr
 	);
@@ -291,4 +292,9 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 GstAppSink* VideoDDSpublisher::appsink()
 {
 	return GST_APP_SINK_CAST(gst_bin_get_by_name(GST_BIN_CAST(m_pipeline), "displayAppSink"));
+}
+
+GstPipeline* VideoDDSpublisher::pipeline()
+{
+	return GST_PIPELINE_CAST(m_pipeline);
 }

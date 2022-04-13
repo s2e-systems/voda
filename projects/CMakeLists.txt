@@ -45,8 +45,6 @@ add_executable(VideoDDSPublisher
 	publisher/main.cpp
 	publisher/videoddspublisher.h
 	publisher/videoddspublisher.cpp
-	common/videowidgetpaintergst.h
-	common/videowidgetpaintergst.cpp
 	common/cameracapabilities.h
 	common/cameracapabilities.cpp
 	common/elements.h
@@ -57,7 +55,6 @@ target_include_directories(VideoDDSPublisher PRIVATE
 	common
 )
 target_link_libraries(VideoDDSPublisher
-	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
 	PRIVATE GStreamer::gstreamer
 	PRIVATE GStreamer::glib
 	PRIVATE GStreamer::gobject
