@@ -6,9 +6,6 @@ option(BUILD_UNIT_TESTS "Weather to build unit tests (requires GoogleTest)" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
-
 find_package(GStreamer REQUIRED COMPONENTS glib gobject base app video)
 
 find_package(CycloneDDS-CXX REQUIRED)
@@ -20,15 +17,11 @@ add_executable(VideoDDSSubscriber
 	subscriber/videoddssubscriber.cpp
 	subscriber/videolistener.h
 	subscriber/videolistener.cpp
-	common/videowidgetpaintergst.h
-	common/videowidgetpaintergst.cpp
 )
 target_include_directories(VideoDDSSubscriber PRIVATE
 	VideoDDSSubscriber
-	common
 )
 target_link_libraries(VideoDDSSubscriber
-	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
 	PRIVATE GStreamer::gstreamer
 	PRIVATE GStreamer::gobject
 	PRIVATE GStreamer::glib
