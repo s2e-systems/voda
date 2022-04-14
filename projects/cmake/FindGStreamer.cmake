@@ -1,19 +1,13 @@
+
+set(GStreamer_RootSearchPath "" CACHE PATH "Additional root path to search GStreamer")
+
+list(APPEND GStreamer_ROOT_SEARCH_PATHS ${GStreamer_RootSearchPath})
+
+list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86_64})
+list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86})
+
 if(UNIX)
   find_package(PkgConfig)
-endif()
-
-list(APPEND GStreamer_ROOT_SEARCH_PATHS ${GStreamer_ROOT_PATH})
-
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  set(GStreamer_64BIT True)
-endif()
-
-if(WIN32)
-  if(GStreamer_64BIT OR 64BIT)
-    list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86_64})
-  else()
-    list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86})
-  endif()
 endif()
 
 # find_gstreamer_component(componentPrefix header_filename libray_name
@@ -88,32 +82,6 @@ if(WIN32)
     PATH_SUFFIXES lib/gstreamer-1.0/include include/gstreamer-1.0)
 endif(WIN32)
 
-# ##############################################################################
-# Find GLib
-
-find_gstreamer_component(GStreamer_glib glib.h glib-2.0 glib-2.0)
-
-# Find the config header file of the glib. Which is for some odd reason in the
-# library dir (in win and linux)
-if(WIN32)
-  find_path(
-    GStreamer_glib_CONFIG_INCLUDE_DIR
-    NAMES glibconfig.h
-    HINTS ${GStreamer_ROOT_SEARCH_PATHS}
-    PATH_SUFFIXES lib/glib-2.0/include)
-else()
-  find_path(
-    GStreamer_glib_CONFIG_INCLUDE_DIR
-    NAMES glibconfig.h
-    HINTS ${PC_GStreamer_glib_LIBRARY_DIRS}
-    PATHS /usr/lib/x86_64-linux-gnu /usr/lib/arm-linux-gnueabihf
-    PATH_SUFFIXES glib-2.0/include)
-endif()
-
-# ##############################################################################
-# Find GObject
-
-find_gstreamer_component(GStreamer_gobject gobject.h gobject-2.0 gobject-2.0)
 
 # ##############################################################################
 # Find GStreamer plugins
@@ -127,128 +95,44 @@ find_gstreamer_component(GStreamer_video gst/video/video.h gstvideo-1.0
 find_gstreamer_component(
   GStreamer_codecparsers gst/codecparsers/gsth264parser.h gstcodecparsers-1.0
   gstreamer-codecparsers-1.0)
+find_gstreamer_component(
+  GStreamer_gl gst/gl/gstglsl.h gstgl-1.0 gstreamer-gl-1.0)
 
-# ##############################################################################
-# Find and check GStreamer version
-
-if(GStreamer_core_INCLUDE_DIR)
-  if(EXISTS "${GStreamer_core_INCLUDE_DIR}/gst/gstversion.h")
-    file(READ "${GStreamer_core_INCLUDE_DIR}/gst/gstversion.h"
-         GStreamer_VERSION_CONTENTS)
-
-    string(REGEX MATCH "#define +GST_VERSION_MAJOR +\\(([0-9]+)\\)" _dummy
-                 "${GStreamer_VERSION_CONTENTS}")
-    set(GStreamer_VERSION_MAJOR "${CMAKE_MATCH_1}")
-
-    string(REGEX MATCH "#define +GST_VERSION_MINOR +\\(([0-9]+)\\)" _dummy
-                 "${GStreamer_VERSION_CONTENTS}")
-    set(GStreamer_VERSION_MINOR "${CMAKE_MATCH_1}")
-
-    string(REGEX MATCH "#define +GST_VERSION_MICRO +\\(([0-9]+)\\)" _dummy
-                 "${GStreamer_VERSION_CONTENTS}")
-    set(GStreamer_VERSION_MICRO "${CMAKE_MATCH_1}")
-
-    set(GStreamer_VERSION
-        "${GStreamer_VERSION_MAJOR}.${GStreamer_VERSION_MINOR}.${GStreamer_VERSION_MICRO}"
-    )
-
-  endif()
-endif()
-
-# ##############################################################################
-# Process the COMPONENTS passed to FIND_PACKAGE
-
-set(GStreamer_RequiredVars
-    GStreamer_core_LIBRARY
-    GStreamer_core_INCLUDE_DIR
-    GStreamer_glib_LIBRARY
-    GStreamer_glib_INCLUDE_DIR
-    GStreamer_gobject_LIBRARY
-    GStreamer_gobject_INCLUDE_DIR
-    GStreamer_glib_CONFIG_INCLUDE_DIR)
-if(WIN32)
-  list(APPEND GStreamer_RequiredVars GStreamer_core_CONFIG_INCLUDE_DIR)
-endif()
-
-include(FindPackageHandleStandardArgs)
-# Note: HANDLE_COMPONENTS is switched on here. This does check if a
-# <component>_FOUND is set to determine if the component was found. This means
-# that the component finding must be done elsewhere and it is not sensible to
-# add component variables to the REQUIRED_VARS
-find_package_handle_standard_args(
-  GStreamer REQUIRED_VARS GStreamer_RequiredVars VERSION_VAR GStreamer_VERSION
-  HANDLE_COMPONENTS)
-
-# TODO: add mark_as_advanced here
 
 # ##############################################################################
 # Handle imported targets
-set(GStreamer_glib_INCLUDE_DIRS ${GStreamer_glib_INCLUDE_DIR}
-                                ${GStreamer_glib_CONFIG_INCLUDE_DIR})
-set(GStreamer_gobject_INCLUDE_DIRS ${GStreamer_gobject_INCLUDE_DIR}
-                                   ${GStreamer_core_CONFIG_INCLUDE_DIR})
 
-# Note: GStreamer_FOUND is set by find_package_handle_standard_args in case
-# everything in GStreamer_RequiredVars is set
-if(GStreamer_FOUND)
-  if(NOT TARGET GStreamer::GStreamer)
-    add_library(GStreamer::gstreamer UNKNOWN IMPORTED)
-    set_target_properties(
-      GStreamer::gstreamer
-      PROPERTIES IMPORTED_LOCATION ${GStreamer_core_LIBRARY}
-                 INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_core_INCLUDE_DIR}")
 
-    add_library(GStreamer::glib UNKNOWN IMPORTED)
-    set_target_properties(
-      GStreamer::glib
-      PROPERTIES IMPORTED_LOCATION ${GStreamer_glib_LIBRARY}
-                 INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_glib_INCLUDE_DIRS}")
+if(NOT TARGET GStreamer::GStreamer)
+  add_library(GStreamer::gstreamer UNKNOWN IMPORTED)
+  set_target_properties(
+    GStreamer::gstreamer
+    PROPERTIES IMPORTED_LOCATION ${GStreamer_core_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_core_INCLUDE_DIR}")
 
-    add_library(GStreamer::gobject UNKNOWN IMPORTED)
-    set_target_properties(
-      GStreamer::gobject
-      PROPERTIES IMPORTED_LOCATION ${GStreamer_gobject_LIBRARY}
-                 INTERFACE_INCLUDE_DIRECTORIES
-                 "${GStreamer_gobject_INCLUDE_DIRS}")
+  add_library(GStreamer::base UNKNOWN IMPORTED)
+  set_target_properties(
+    GStreamer::base
+    PROPERTIES IMPORTED_LOCATION ${GStreamer_base_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_base_INCLUDE_DIR}")
 
-    add_library(GStreamer::base UNKNOWN IMPORTED)
-    set_target_properties(
-      GStreamer::base
-      PROPERTIES IMPORTED_LOCATION ${GStreamer_base_LIBRARY}
-                 INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_base_INCLUDE_DIR}")
+  add_library(GStreamer::app UNKNOWN IMPORTED)
+  set_target_properties(
+    GStreamer::app
+    PROPERTIES IMPORTED_LOCATION ${GStreamer_app_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_app_INCLUDE_DIR}")
 
-    add_library(GStreamer::app UNKNOWN IMPORTED)
-    set_target_properties(
-      GStreamer::app
-      PROPERTIES IMPORTED_LOCATION ${GStreamer_app_LIBRARY}
-                 INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_app_INCLUDE_DIR}")
+  add_library(GStreamer::video UNKNOWN IMPORTED)
+  set_target_properties(
+    GStreamer::video
+    PROPERTIES IMPORTED_LOCATION ${GStreamer_video_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_video_INCLUDE_DIR}")
 
-    add_library(GStreamer::video UNKNOWN IMPORTED)
-    set_target_properties(
-      GStreamer::video
-      PROPERTIES IMPORTED_LOCATION ${GStreamer_video_LIBRARY}
-                 INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_video_INCLUDE_DIR}")
+  add_library(GStreamer::codecparsers UNKNOWN IMPORTED)
+  set_target_properties(
+    GStreamer::codecparsers
+    PROPERTIES IMPORTED_LOCATION ${GStreamer_codecparsers_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES
+                "${GStreamer_codecparsers_INCLUDE_DIR}")
 
-    add_library(GStreamer::codecparsers UNKNOWN IMPORTED)
-    set_target_properties(
-      GStreamer::codecparsers
-      PROPERTIES IMPORTED_LOCATION ${GStreamer_codecparsers_LIBRARY}
-                 INTERFACE_INCLUDE_DIRECTORIES
-                 "${GStreamer_codecparsers_INCLUDE_DIR}")
-
-  endif()
 endif()
-
-include(CMakePrintHelpers)
-cmake_print_properties(
-  TARGETS
-  GStreamer::gstreamer
-  GStreamer::glib
-  GStreamer::gobject
-  GStreamer::base
-  GStreamer::app
-  GStreamer::video
-  GStreamer::codecparsers
-  PROPERTIES
-  IMPORTED_LOCATION
-  INTERFACE_INCLUDE_DIRECTORIES)
