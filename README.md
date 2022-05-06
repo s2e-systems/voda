@@ -11,8 +11,7 @@ The project is developed using only open source and cross platform dependencies.
 - Eclipse Cyclone DDS™ (v 0.9.0a1)
   - https://github.com/eclipse-cyclonedds/cyclonedds
   - https://github.com/eclipse-cyclonedds/cyclonedds-cxx
-- Qt (v 6.2)
-  - https://www.qt.io/
+
 
 Other version of these components probably work as well.
 
@@ -25,5 +24,5 @@ To build the software the CMakeLists.txt files are using the following environme
 
 For run the software the shared library binaries must be added to the PATH environment variable in Windows and to the ldconfig search directories in Linux. In Windows that may be for example:
 1. %GSTREAMER_1_0_ROOT_X86_64%\bin
-2. %QTDIR%\bin
+
 
