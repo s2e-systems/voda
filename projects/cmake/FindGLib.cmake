@@ -8,7 +8,7 @@ list(APPEND GLib_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86_64})
 list(APPEND GLib_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86})
 
 if(UNIX)
-find_package(PkgConfig)
+  find_package(PkgConfig)
   pkg_check_modules(PkgConfig_glib glib-2.0)
 endif()
 

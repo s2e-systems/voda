@@ -8,7 +8,7 @@ list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86})
 
 
 if(UNIX)
-find_package(PkgConfig)
+  find_package(PkgConfig)
   pkg_check_modules(PkgConfig_gstreamer gstreamer-1.0)
   pkg_check_modules(PkgConfig_base gstreamer-base-1.0)
   pkg_check_modules(PkgConfig_app gstreamer-app-1.0)
@@ -56,6 +56,12 @@ find_path(GStreamer_gl_INCLUDE_DIR NAMES gst/gl/gl.h
   PATHS ${GStreamer_ROOT_SEARCH_PATHS} ${PkgConfig_gl_INCLUDE_DIRS}
   PATH_SUFFIXES include/gstreamer-1.0
 )
+find_path(GStreamer_glConfig_INCLUDE_DIR NAMES gst/gl/gstglconfig.h
+  PATHS ${GStreamer_ROOT_SEARCH_PATHS} ${PkgConfig_gl_INCLUDE_DIRS}
+  PATH_SUFFIXES lib/gstreamer-1.0/include include/gstreamer-1.0
+)
+set(GStreamer_gl_INCLUDE_DIRS ${GStreamer_gl_INCLUDE_DIR} ${GStreamer_glConfig_INCLUDE_DIR})
+
 find_library(GStreamer_gl_LIBRARY NAMES gstgl-1.0
   PATHS ${GStreamer_ROOT_SEARCH_PATHS} ${PkgConfig_gl_LIBRARY_DIRS}
   PATH_SUFFIXES lib
@@ -86,6 +92,6 @@ if(NOT TARGET GStreamer::GStreamer)
   add_library(GStreamer::gl UNKNOWN IMPORTED)
   set_target_properties(GStreamer::gl PROPERTIES
     IMPORTED_LOCATION "${GStreamer_gl_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_gl_INCLUDE_DIR}"
+    INTERFACE_INCLUDE_DIRECTORIES "${GStreamer_gl_INCLUDE_DIRS}"
   )
 endif()
