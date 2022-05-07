@@ -11,9 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-#include <QApplication>
-
 #include <stdexcept>
 #include <string>
 
@@ -21,20 +18,33 @@
 
 #include "videoddssubscriber.h"
 #include "videolistener.h"
-#include "videowidgetpaintergst.h"
 
 #include "dds/dds.hpp"
 #include "VideoDDS.hpp"
 
 using namespace org::eclipse::cyclonedds;
 
+static gboolean bus_callback(GstBus* bus, GstMessage* msg, gpointer data)
+{
+	auto loop = (GMainLoop*)data;
+
+	switch (GST_MESSAGE_TYPE(msg))
+	{
+		case GST_MESSAGE_EOS:
+		case GST_MESSAGE_ERROR:
+			g_main_loop_quit(loop);
+			break;
+		default:
+			break;
+	}
+
+	return TRUE;
+}
+
 int main(int argc, char *argv[])
 {
 	try
 	{
-		QApplication application{argc, argv};
-		application.setApplicationName("Video DDS Subscriber");
-
 		GError* error = nullptr;
 		gboolean use_omx = FALSE;
 		GOptionEntry entries[] =
@@ -94,10 +104,14 @@ int main(int argc, char *argv[])
 		// Create the data reader for the video topic
 		dds::sub::DataReader<S2E::Video> dataReader{subscriber, topic, dataReaderQos, &videoListener, mask};
 
-		VideoWidgetPainterGst widget{videoSubscriber.displayAppSink()};
-		widget.show();
 
-		return application.exec();
+		auto loop = g_main_loop_new(nullptr /*context*/, FALSE /*is_running*/);
+
+		auto bus = gst_pipeline_get_bus(videoSubscriber.pipeline());
+		gst_bus_add_watch(bus, bus_callback, loop);
+		gst_object_unref(bus);
+
+		g_main_loop_run(loop);
 	}
 	catch(const dds::core::OutOfResourcesError& e)
 	{

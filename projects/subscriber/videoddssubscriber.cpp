@@ -18,8 +18,8 @@
 
 VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 {
-	auto pipeline = gst_pipeline_new("subscriber");
-	if (pipeline == nullptr)
+	m_pipeline = gst_pipeline_new("subscriber");
+	if (m_pipeline == nullptr)
 	{
 		throw std::runtime_error{"gst_pipeline_new failed"};
 	}
@@ -41,7 +41,7 @@ VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 		nullptr
 	);
 
-	gst_bin_add(GST_BIN_CAST(pipeline), m_ddsAppSrc);
+	gst_bin_add(GST_BIN_CAST(m_pipeline), m_ddsAppSrc);
 
 	GstElement* decoder = nullptr;
 	if (useOmx == true)
@@ -53,21 +53,18 @@ VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 		decoder = gst_element_factory_make("avdec_h264", nullptr);
 	}
 
-	gst_bin_add(GST_BIN_CAST(pipeline), decoder);
+	gst_bin_add(GST_BIN_CAST(m_pipeline), decoder);
 	gst_element_link(m_ddsAppSrc, decoder);
 
 	auto converter = gst_element_factory_make("videoconvert", nullptr);
-	m_displayAppSink = gst_element_factory_make("appsink", nullptr);
-	gst_bin_add(GST_BIN_CAST(pipeline), converter);
-	gst_bin_add(GST_BIN_CAST(pipeline), m_displayAppSink);
+	m_displayAppSink = gst_element_factory_make("glimagesink", nullptr);
+	gst_bin_add(GST_BIN_CAST(m_pipeline), converter);
+	gst_bin_add(GST_BIN_CAST(m_pipeline), m_displayAppSink);
 	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
 		"format", G_TYPE_STRING, "RGBA",
 		nullptr
 	);
 	g_object_set(m_displayAppSink,
-		"caps", displaySinkCaps,
-		"max-buffers", 1,
-		"drop", true,
 		"sync", false,
 		nullptr
 	);
@@ -75,10 +72,10 @@ VideoDDSsubscriber::VideoDDSsubscriber(bool useOmx)
 	gst_element_link(converter, m_displayAppSink);
 
 
-	auto pipelineStartSucess = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+	auto pipelineStartSucess = gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
 	if (pipelineStartSucess == GST_STATE_CHANGE_FAILURE)
 	{
-		auto bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline));
+		auto bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
 		gst_bus_set_flushing(bus, true);
 		gst_object_unref(bus);
 		throw std::runtime_error{"Set pipeline to playing failed"};
@@ -92,4 +89,9 @@ GstAppSink* VideoDDSsubscriber::displayAppSink() const
 GstAppSrc* VideoDDSsubscriber::ddsAppSrc() const
 {
 	return GST_APP_SRC_CAST(m_ddsAppSrc);
+}
+
+GstPipeline* VideoDDSsubscriber::pipeline() const
+{
+	return GST_PIPELINE_CAST(m_pipeline);
 }

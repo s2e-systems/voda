@@ -31,6 +31,7 @@ public:
 	VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWriter, bool useTestSrc, bool useOmx, bool useFixedCaps);
 	~VideoDDSpublisher();
 	GstAppSink* appsink();
+	GstPipeline* pipeline();
 
 private:
 	dds::pub::DataWriter<S2E::Video> m_dataWriter;

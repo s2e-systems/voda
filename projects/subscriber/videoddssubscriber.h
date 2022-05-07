@@ -30,11 +30,13 @@ public:
 	VideoDDSsubscriber(bool useOmx);
 	GstAppSink* displayAppSink() const;
 	GstAppSrc* ddsAppSrc() const;
+	GstPipeline* pipeline() const;
 
 private:
 
 	GstElement* m_displayAppSink;
 	GstElement* m_ddsAppSrc;
+	GstElement* m_pipeline;
 };
 
 #endif
