@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">My Gstreamer build</string>
+    <string name="button_play">Play</string>
+    <string name="button_stop">Stop</string>
+</resources>

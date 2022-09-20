@@ -6,3 +6,8 @@ projects/CMakeLists.txt.user
 *.autosave
 projects/build/
 projects/.vscode/
+projects/android-publisher/local.properties
+projects/android-publisher/.gradle/
+projects/android-publisher/.idea/
+projects/android-publisher/app/.cxx/
+projects/android-publisher/app/build/
