@@ -11,3 +11,6 @@ projects/android-publisher/.gradle/
 projects/android-publisher/.idea/
 projects/android-publisher/app/.cxx/
 projects/android-publisher/app/build/
+projects/android-publisher/.vscode/
+projects/android-subscriber/build/
+projects/android-subscriber/CMakeUserPresets.json

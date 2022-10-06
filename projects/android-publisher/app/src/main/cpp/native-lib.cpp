@@ -287,13 +287,6 @@ extern "C" JNIEXPORT void JNICALL
     data->app = env->NewGlobalRef(thiz);
     GST_DEBUG ("Created GlobalRef for app object at %p", data->app);
     pthread_create (&gst_app_thread, NULL, &app_function, data);
-
-    const std::string topicName = "VideoStream";
-    const dds::domain::DomainParticipant dp{domain::default_id()};
-    const dds::topic::qos::TopicQos topicQos{dp.default_topic_qos()};
-    const dds::topic::Topic<S2E::Video> topic{dp, topicName, topicQos};
-    const dds::pub::Publisher publisher{dp};
-    dds::pub::DataWriter<S2E::Video> dataWriter{publisher, topic};
 }
 
 /* Quit the main loop, remove the native thread and free resources */
