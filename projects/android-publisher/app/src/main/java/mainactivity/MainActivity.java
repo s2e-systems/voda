@@ -49,9 +49,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        final TextView tv = binding.textviewMessage;
+        tv.setText("starting ... ");
 
         String ret = nativeDdsInit();
-        final TextView tv = binding.textviewMessage;
         tv.setText(ret);
 //        Toast.makeText(this, ret, Toast.LENGTH_LONG).show();
 

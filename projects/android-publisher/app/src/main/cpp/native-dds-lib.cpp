@@ -1,5 +1,6 @@
 #include <sstream>
 #include <jni.h>
+#include <unistd.h>
 #include <dds/dds.hpp>
 #include "VideoDDS.hpp"
 
@@ -32,6 +33,8 @@ Java_mainactivity_MainActivity_nativeDdsInit(JNIEnv *env, jobject thiz)
     ss << "Domain participant: ";
 //    dp = dds_create_participant(DDS_DOMAIN_DEFAULT, NULL, NULL);
 
+    putenv("CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface name=\"eth1\" /></Interfaces></General></Domain></CycloneDDS>");
+
     try {
         dds_wrapper = new DDSwrapper{};
 //        const dds::domain::DomainParticipant dp{domain::default_id()};
@@ -39,7 +42,13 @@ Java_mainactivity_MainActivity_nativeDdsInit(JNIEnv *env, jobject thiz)
 //        const dds::topic::Topic<S2E::Video> topic{dp, topicName, topicQos};
 //        const dds::pub::Publisher publisher{dp};
 //        dds::pub::DataWriter<S2E::Video> dataWriter{publisher, topic};
-        ss << "good";
+        for (int i = 0; i < 100; i++)
+        {
+            const S2E::Video v{1, i, std::vector<uint8_t>{1, 2, 3, 4}};
+            dds_wrapper->dataWriter.write(v);
+            usleep(200000);
+        }
+        ss << "very good";
     } catch (...) {
         ss << "NOT good";
     }
