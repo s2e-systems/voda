@@ -7,16 +7,18 @@
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 #include <gst/gst.h>
+#include <gst/gstbin.h>
 #include <gst/video/video.h>
+#include <gst/app/gstappsink.h>
 #include <pthread.h>
 
-#include <dds/dds.hpp>
-#include "VideoDDS.hpp"
-
-using namespace org::eclipse::cyclonedds;
+//#include <dds/dds.hpp>
+//#include "VideoDDS.hpp"
+//
+//using namespace org::eclipse::cyclonedds;
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_mygstreamerbuild_MainActivity_stringFromJNI(
+Java_mainactivity_MainActivity_stringFromJNI(
         JNIEnv* env,
         jobject /* this */) {
 
@@ -198,6 +200,78 @@ check_initialization_complete (CustomData * data)
     }
 }
 
+
+
+
+/////////////////////
+//  DDS
+//
+#include <dds/dds.hpp>
+#include "VideoDDS.hpp"
+
+using namespace org::eclipse::cyclonedds;
+
+struct DDSwrapper {
+    DDSwrapper(const std::string topicName = "VideoStream") :
+            dp{domain::default_id()},
+            topicQos{dp.default_topic_qos()},
+            topic{dp, topicName, topicQos},
+            publisher{dp},
+            dataWriter{publisher, topic}
+    {
+
+    }
+    dds::domain::DomainParticipant dp;
+    const dds::topic::qos::TopicQos topicQos;
+    const dds::topic::Topic<S2E::Video> topic;
+    const dds::pub::Publisher publisher;
+    dds::pub::DataWriter<S2E::Video> dataWriter;
+};
+
+DDSwrapper* dds_wrapper = nullptr;
+
+static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userData)
+{
+    auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video>* >(userData);
+    if (dataWriter == nullptr || dataWriter->is_nil())
+    {
+        GST_ERROR("DataWriter not valid");
+        return GST_FLOW_ERROR;
+    }
+
+    const int userid = 0;
+    // Count the samples that have arrived. Used also to define the
+    // DDS msg number later
+    static int frameNum = 0;
+    frameNum++;
+
+    // Pull a sample from the GStreamer pipeline
+    auto sample = gst_app_sink_pull_sample(appSink);
+    if(sample != nullptr)
+    {
+        auto sampleBuffer = gst_sample_get_buffer(sample);
+        if(sampleBuffer != nullptr)
+        {
+            GstMapInfo mapInfo;
+            gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
+
+            const auto byteCount = int(mapInfo.size);
+            const auto rawData = static_cast<uint8_t* >(mapInfo.data);
+            const dds::core::ByteSeq frame{rawData, rawData + byteCount};
+            *dataWriter << S2E::Video{userid, frameNum, frame};
+            gst_buffer_unmap(sampleBuffer, &mapInfo);
+        }
+        gst_sample_unref(sample);
+    }
+
+    return GST_FLOW_OK;
+}
+
+
+//  END DDS
+///////////////////
+
+
 /* Main method for the native code. This is executed on its own thread. */
 static void *
 app_function (void *userdata)
@@ -216,7 +290,7 @@ app_function (void *userdata)
 
     /* Build pipeline */
     data->pipeline =
-            gst_parse_launch ("videotestsrc ! openh264enc ! openh264dec ! videoconvert ! autovideosink",
+            gst_parse_launch("ahcsrc ! videoconvert ! tee name=t ! queue ! autovideosink  t. ! queue ! openh264enc ! appsink name=app_sink",
                               &error);
     if (error) {
         gchar *message =
@@ -226,6 +300,34 @@ app_function (void *userdata)
         g_free (message);
         return NULL;
     }
+
+    GstElement* app_sink = gst_bin_get_by_name(GST_BIN(data->pipeline), "app_sink");
+    if (!app_sink) {
+        GST_ERROR ("Could not retrieve app_sink");
+        return NULL;
+    } else{
+        GST_DEBUG("app_sink found");
+    }
+
+    g_object_set(app_sink,
+                 "emit-signals", true,
+//                 "caps", ddsSinkCaps,
+                 "max-buffers", 1,
+                 "drop", false,
+                 "sync", false,
+                 nullptr
+    );
+
+    putenv("CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface name=\"eth1\" /></Interfaces></General></Domain></CycloneDDS>");
+    try {
+        dds_wrapper = new DDSwrapper{};
+    } catch (...) {
+        GST_ERROR ("Could not create DDS stuff");
+        return NULL;
+    }
+
+    g_signal_connect(app_sink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
+                     reinterpret_cast<gpointer>(&dds_wrapper->dataWriter));
 
     /* Set the pipeline to READY, so it can already accept a window handle, if we have one */
     gst_element_set_state (data->pipeline, GST_STATE_READY);
@@ -276,7 +378,7 @@ app_function (void *userdata)
 
 /* Instruct the native code to create its internal data structure, pipeline and thread */
 extern "C" JNIEXPORT void JNICALL
-        Java_com_example_mygstreamerbuild_MainActivity_nativeInit (JNIEnv * env, jobject thiz)
+        Java_mainactivity_MainActivity_nativeInit (JNIEnv * env, jobject thiz)
 {
     CustomData *data = g_new0 (CustomData, 1);
     SET_CUSTOM_DATA (env, thiz, custom_data_field_id, data);
@@ -291,7 +393,7 @@ extern "C" JNIEXPORT void JNICALL
 
 /* Quit the main loop, remove the native thread and free resources */
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_mygstreamerbuild_MainActivity_nativeFinalize(JNIEnv * env, jobject thiz)
+Java_mainactivity_MainActivity_nativeFinalize(JNIEnv * env, jobject thiz)
 {
     CustomData *data = GET_CUSTOM_DATA (env, thiz, custom_data_field_id);
     if (!data)
@@ -310,7 +412,7 @@ Java_com_example_mygstreamerbuild_MainActivity_nativeFinalize(JNIEnv * env, jobj
 
 /* Set pipeline to PLAYING state */
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_mygstreamerbuild_MainActivity_nativePlay(JNIEnv * env, jobject thiz)
+Java_mainactivity_MainActivity_nativePlay(JNIEnv * env, jobject thiz)
 {
     CustomData *data = GET_CUSTOM_DATA (env, thiz, custom_data_field_id);
     if (!data)
@@ -321,7 +423,7 @@ Java_com_example_mygstreamerbuild_MainActivity_nativePlay(JNIEnv * env, jobject 
 
 /* Set pipeline to PAUSED state */
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_mygstreamerbuild_MainActivity_nativePause (JNIEnv * env, jobject thiz)
+Java_mainactivity_MainActivity_nativePause (JNIEnv * env, jobject thiz)
 {
     CustomData *data = GET_CUSTOM_DATA (env, thiz, custom_data_field_id);
     if (!data)
@@ -333,7 +435,7 @@ Java_com_example_mygstreamerbuild_MainActivity_nativePause (JNIEnv * env, jobjec
 
 /* Static class initializer: retrieve method and field IDs */
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_mygstreamerbuild_MainActivity_nativeClassInit(JNIEnv * env, jclass klass)
+Java_mainactivity_MainActivity_nativeClassInit(JNIEnv * env, jclass klass)
 {
     custom_data_field_id =
             env->GetFieldID(klass, "native_custom_data", "J");
@@ -355,7 +457,7 @@ Java_com_example_mygstreamerbuild_MainActivity_nativeClassInit(JNIEnv * env, jcl
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_mygstreamerbuild_MainActivity_nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
+Java_mainactivity_MainActivity_nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
 {
     CustomData *data = GET_CUSTOM_DATA (env, thiz, custom_data_field_id);
     if (!data)
@@ -386,7 +488,7 @@ Java_com_example_mygstreamerbuild_MainActivity_nativeSurfaceInit(JNIEnv * env, j
 
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_mygstreamerbuild_MainActivity_nativeSurfaceFinalize(JNIEnv * env, jobject thiz)
+Java_mainactivity_MainActivity_nativeSurfaceFinalize(JNIEnv * env, jobject thiz)
 {
     CustomData *data = GET_CUSTOM_DATA (env, thiz, custom_data_field_id);
     if (!data)
@@ -417,6 +519,9 @@ JNI_OnLoad (JavaVM * vm, void *reserved)
                              "Could not retrieve JNIEnv");
         return 0;
     }
+
+    putenv("GST_DEBUG=3");
+
 //    jclass klass = (*env)->FindClass (env,
 //                                      "org/freedesktop/gstreamer/tutorials/tutorial_3/Tutorial3");
 //    (*env)->RegisterNatives (env, klass, native_methods,
