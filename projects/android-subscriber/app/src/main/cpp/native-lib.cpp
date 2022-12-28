@@ -1,15 +1,19 @@
 #include <jni.h>
 #include <gst/gst.h>
 #include <string>
+#include <chrono>
+#include <thread>
 #include <android/log.h>
 
 #include <stdint.h>
+
+
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 #include <gst/gst.h>
 #include <gst/gstbin.h>
 #include <gst/video/video.h>
-#include <gst/app/gstappsink.h>
+#include <gst/app/gstappsrc.h>
 #include <pthread.h>
 
 
@@ -185,9 +189,6 @@ check_initialization_complete (CustomData * data)
     }
 }
 
-
-
-
 /////////////////////
 //  DDS
 
@@ -196,62 +197,78 @@ check_initialization_complete (CustomData * data)
 
 using namespace org::eclipse::cyclonedds;
 
+
+class VideoListener : public virtual dds::sub::DataReaderListener<S2E::Video>,
+                      public virtual dds::sub::NoOpDataReaderListener<S2E::Video> {
+public:
+    VideoListener(GstAppSrc* const appSrc) :
+            m_appSrc(appSrc)
+    {    }
+
+private:
+    virtual void on_data_available(dds::sub::DataReader<S2E::Video>& reader)
+    {
+        //Check if the GStreamer pipeline is running, by checking the state of the appsrc
+        GstState appSrcState = GST_STATE_NULL;
+        gst_element_get_state(GST_ELEMENT(m_appSrc), &appSrcState, nullptr /*pending*/, 10/*timeout nanosec*/);
+        if (appSrcState != GST_STATE_PLAYING && appSrcState != GST_STATE_PAUSED && appSrcState != GST_STATE_READY)
+        {
+            return;
+        }
+
+        const auto samples = reader.take();
+
+        // It may happen that multiple samples came in in one go, in that
+        // case all the samples are pushed into the GStreamer pipeline.
+        for (const auto& sample : samples)
+        {
+            if(sample.info().valid() == false)
+            {
+                continue;
+            }
+
+            std::cout << "received frame " << sample.data().frameNum() << std::endl;
+
+            const auto& frame = sample.data().frame();
+            const auto rawDataPtr = reinterpret_cast<const void *>(frame.data());
+            const auto byteCount = static_cast<const gsize>(sample.data().frame().size());
+
+            // Copy the arrived memory from the DDS into a GStreamer buffer
+            GstMapInfo mapInfo;
+            auto gstBuffer = gst_buffer_new_allocate(nullptr /* no allocator */, byteCount, nullptr /* no parameter */);
+            gst_buffer_map(gstBuffer, &mapInfo, GST_MAP_WRITE);
+            std::memcpy(static_cast<void*>(mapInfo.data), rawDataPtr, byteCount);
+            gst_buffer_unmap(gstBuffer, &mapInfo);
+
+            // Push the buffer into the pipeline. Data freeing is now handled by the pipeline
+            const auto ret = gst_app_src_push_buffer(m_appSrc, gstBuffer);
+            if (ret != GST_FLOW_OK)
+            {
+                return;
+            }
+        }
+    }
+
+    GstAppSrc* const m_appSrc;
+};
+
 struct DomainParticipant {
     DomainParticipant() : dp{domain::default_id()} {}
     dds::domain::DomainParticipant dp;
 };
 template <typename T>
-struct DataWriter {
-    DataWriter(const dds::pub::Publisher& pub,
+struct DataReader {
+    DataReader(const dds::sub::Subscriber& sub,
                const ::dds::topic::Topic<T>& topic,
-               const dds::pub::qos::DataWriterQos& qos,
-               dds::pub::DataWriterListener<T>* listener = NULL,
-               const dds::core::status::StatusMask& mask = ::dds::core::status::StatusMask::none()) :
-                data_writerr{pub, topic, qos, listener, mask} {}
+               const dds::sub::qos::DataReaderQos& qos,
+               dds::sub::DataReaderListener<T>* listener = NULL,
+               const dds::core::status::StatusMask& mask = ::dds::core::status::StatusMask::none()) : data_reader{sub, topic, qos, listener, mask} {}
 
-    dds::pub::DataWriter<S2E::Video> data_writerr;
+    dds::sub::DataReader<S2E::Video> data_reader;
 };
 DomainParticipant* domain_participant;
-DataWriter<S2E::Video>* data_writer;
-
-
-static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userData)
-{
-    auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video>* >(userData);
-    if (dataWriter == nullptr || dataWriter->is_nil())
-    {
-        GST_ERROR("DataWriter not valid");
-        return GST_FLOW_ERROR;
-    }
-
-    const int userid = 0;
-    // Count the samples that have arrived. Used also to define the
-    // DDS msg number later
-    static int frameNum = 0;
-    frameNum++;
-
-    // Pull a sample from the GStreamer pipeline
-    auto sample = gst_app_sink_pull_sample(appSink);
-    if(sample != nullptr)
-    {
-        auto sampleBuffer = gst_sample_get_buffer(sample);
-        if(sampleBuffer != nullptr)
-        {
-            GstMapInfo mapInfo;
-            gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
-
-            const auto byteCount = int(mapInfo.size);
-            const auto rawData = static_cast<uint8_t* >(mapInfo.data);
-            const dds::core::ByteSeq frame{rawData, rawData + byteCount};
-            *dataWriter << S2E::Video{userid, frameNum, frame};
-            gst_buffer_unmap(sampleBuffer, &mapInfo);
-        }
-        gst_sample_unref(sample);
-    }
-
-    return GST_FLOW_OK;
-}
-
+DataReader<S2E::Video>* data_reader;
+VideoListener* video_listener;
 
 //  END DDS
 ///////////////////
@@ -274,9 +291,8 @@ app_function (void *userdata)
     g_main_context_push_thread_default (data->context);
 
     /* Build pipeline */
-    data->pipeline =
-            gst_parse_launch("ahcsrc ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! openh264enc ! appsink name=app_sink",
-                              &error);
+    data->pipeline = gst_parse_launch("appsrc name=app_src ! openh264dec ! videoconvert ! autovideosink", &error);
+//    amcvideodec-omxgoogleh264decoder
     if (error) {
         gchar *message =
                 g_strdup_printf ("Unable to build pipeline: %s", error->message);
@@ -286,51 +302,59 @@ app_function (void *userdata)
         return NULL;
     }
 
-    GstElement* app_sink = gst_bin_get_by_name(GST_BIN(data->pipeline), "app_sink");
-    if (!app_sink) {
-        GST_ERROR ("Could not retrieve app_sink");
-        return NULL;
-    } else{
-        GST_DEBUG("app_sink found");
-    }
+    auto src_caps = gst_caps_new_simple("video/x-h264",
+                                       "stream-format", G_TYPE_STRING, "byte-stream",
+                                       "alignment", G_TYPE_STRING, "au",
+                                        "profile", G_TYPE_STRING, "constrained-baseline",
+                                       nullptr
+    );
 
-    g_object_set(app_sink,
-                 "emit-signals", true,
-//                 "caps", ddsSinkCaps,
-                 "max-buffers", 1,
-                 "drop", false,
-                 "sync", false,
+    GstElement* app_src = gst_bin_get_by_name(GST_BIN(data->pipeline), "app_src");
+
+    g_object_set(app_src,
+                 "caps", src_caps,
+                 "is-live", true,
+                 "format", GST_FORMAT_TIME,
                  nullptr
     );
 
-    putenv("CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface name=\"eth1\" /></Interfaces></General></Domain></CycloneDDS>");
-    try {
-        const std::string topicName = "VideoStream";
+//    auto sink_caps = gst_caps_new_simple("video/x-h264",
+//                                         "stream-format", G_TYPE_STRING, "byte-stream",
+//                                        "profile", G_TYPE_STRING, "constrained-baseline",
+//                                         "level", G_TYPE_STRING, "2",
+//                                         nullptr
+//    );
+//    GstElement* caps_filter = gst_bin_get_by_name(GST_BIN(data->pipeline), "caps_filter");
+//    g_object_set(caps_filter, "caps", sink_caps, nullptr);
 
-        domain_participant = new DomainParticipant;
+   putenv("CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface name=\"eth1\" presence_required=\"false\"/></Interfaces></General></Domain></CycloneDDS>");
+    try {
+        DomainParticipant* domain_participant = new DomainParticipant;
         const dds::topic::qos::TopicQos topicQos{domain_participant->dp.default_topic_qos()};
-        const dds::topic::Topic<S2E::Video> topic{domain_participant->dp, topicName, topicQos};
-        const dds::pub::qos::PublisherQos publisherQos{domain_participant->dp.default_publisher_qos()};
-        const dds::pub::Publisher publisher{domain_participant->dp, publisherQos};
-        dds::pub::qos::DataWriterQos dataWriterQos{topic.qos()};
-        dataWriterQos << dds::core::policy::WriterDataLifecycle::AutoDisposeUnregisteredInstances();
-        dataWriterQos << dds::core::policy::Ownership::Exclusive();
-        dataWriterQos << dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(5000));
-        dataWriterQos << dds::core::policy::OwnershipStrength(1000);
-        data_writer = new DataWriter<S2E::Video>{publisher, topic, dataWriterQos};
+        const dds::topic::Topic<S2E::Video> topic{domain_participant->dp, "VideoStream", topicQos};
+        const dds::sub::qos::SubscriberQos subscriberQos{domain_participant->dp.default_subscriber_qos()};
+        const dds::sub::Subscriber subscriber{domain_participant->dp, subscriberQos};
+        dds::sub::qos::DataReaderQos dataReaderQos{topic.qos()};
+        dataReaderQos << dds::core::policy::Ownership::Exclusive();
+        dataReaderQos << dds::core::policy::Liveliness::Automatic();
+        dataReaderQos << dds::core::policy::History{dds::core::policy::HistoryKind::KEEP_LAST, 20};
+
+        dds::core::status::StatusMask mask;
+        mask << dds::core::status::StatusMask::data_available();
+
+        video_listener = new VideoListener(GST_APP_SRC_CAST(app_src));
+        data_reader = new DataReader<S2E::Video>{subscriber, topic, dataReaderQos, video_listener, mask};
+
     } catch (...) {
-        GST_ERROR ("Could not create DDS stuff");
+        GST_ERROR("Could not create DDS stuff");
         return NULL;
     }
 
-    g_signal_connect(app_sink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
-                     reinterpret_cast<gpointer>(data_writer));
-
     /* Set the pipeline to READY, so it can already accept a window handle, if we have one */
-    gst_element_set_state (data->pipeline, GST_STATE_READY);
+    gst_element_set_state(data->pipeline, GST_STATE_READY);
 
     data->video_sink =
-            gst_bin_get_by_interface (GST_BIN (data->pipeline),
+            gst_bin_get_by_interface(GST_BIN(data->pipeline),
                                       GST_TYPE_VIDEO_OVERLAY);
     if (!data->video_sink) {
         GST_ERROR ("Could not retrieve video sink");
@@ -405,7 +429,8 @@ Java_mainactivity_MainActivity_nativeFinalize(JNIEnv * env, jobject thiz)
     g_free (data);
     SET_CUSTOM_DATA (env, thiz, custom_data_field_id, NULL);
 
-    delete data_writer;
+    delete data_reader;
+    delete video_listener;
     delete domain_participant;
 
     GST_DEBUG ("Done finalizing");

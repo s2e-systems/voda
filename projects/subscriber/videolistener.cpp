@@ -46,6 +46,9 @@ void VideoListener::on_data_available(dds::sub::DataReader<S2E::Video>& reader)
 		{
 			continue;
 		}
+
+		std::cout << "received frame " << sample.data().frameNum() << std::endl;
+
 		const auto& frame = sample.data().frame();
 		const auto rawDataPtr = reinterpret_cast<const void *>(frame.data());
 		const auto byteCount = static_cast<const gsize>(sample.data().frame().size());

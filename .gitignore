@@ -14,3 +14,10 @@ projects/android-publisher/app/build/
 projects/android-publisher/.vscode/
 projects/android-subscriber/build/
 projects/android-subscriber/CMakeUserPresets.json
+projects/android-subscriber/app/.cxx/Debug/c704z473/armeabi-v7a/.cmake/api/v1/reply/cmakeFiles-v1-d820cd7eecc8f17f8441.json
+projects/android-subscriber/app/.cxx/
+projects/android-subscriber/app/build/
+projects/android-subscriber/.gradle/
+projects/android-subscriber/.idea/
+projects/android-subscriber/.vscode/
+projects/subscriber/videolistener.cpp

@@ -50,6 +50,8 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 			const dds::core::ByteSeq frame{rawData, rawData + byteCount};
 			*dataWriter << S2E::Video{userid, frameNum, frame};
 			gst_buffer_unmap(sampleBuffer, &mapInfo);
+
+			std::cout << "sent frame number " << frameNum << std::endl;
 		}
 		gst_sample_unref(sample);
 	}
@@ -173,6 +175,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	else
 	{
 		factory = gst_element_factory_find("x264enc");
+		factory = gst_element_factory_find("openh264enc");
 	}
 	if (factory == nullptr)
 	{
@@ -215,6 +218,11 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 			"aud", gboolean(false), // Use AU (Access Unit) delimiter
 			nullptr
 		);
+		gst_element_link(encoder, ddsAppSink);
+	}
+	else
+	if (encoderName == "openh264enc")
+	{
 		gst_element_link(encoder, ddsAppSink);
 	}
 	else

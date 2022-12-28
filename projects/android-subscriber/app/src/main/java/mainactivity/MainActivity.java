@@ -35,7 +35,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
     static {
          System.loadLibrary("gstreamer_android");
-        System.loadLibrary("android_publisher");
+        System.loadLibrary("android_subscriber");
          nativeClassInit();
     }
 
@@ -121,9 +121,15 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
      // the main loop is running, so it is ready to accept commands.
      private void onGStreamerInitialized () {
          final TextView tv = binding.textviewMessage;
-         tv.setText("GStreamer initialized");
+         tv.setText("Gst initialized. Start playing");
          Log.i ("GStreamer", "Gst initialized. Start playing");
-         nativePlay();
+//         Log.i ("GStreamer", "Gst initialized. Restoring state, playing:" + is_playing_desired);
+         // Restore previous playing state
+//         if (is_playing_desired) {
+             nativePlay();
+//         } else {
+//             nativePause();
+//         }
 
          // Re-enable buttons, now that GStreamer is initialized
          final Activity activity = this;

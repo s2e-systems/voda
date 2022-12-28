@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VoDA Publisher</string>
+    <string name="app_name">VoDA Subscriber</string>
     <string name="button_play">Play</string>
     <string name="button_stop">Stop</string>
 </resources>
