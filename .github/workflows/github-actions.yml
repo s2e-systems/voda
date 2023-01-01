@@ -10,6 +10,6 @@ jobs:
       steps:
       - uses: actions/checkout@v3
       - name: Configure CMake
-        run: cmake -B $GITHUB_WORKSPACE/build -S $GITHUB_WORKSPACE/projects
+        run: cmake -B $GITHUB_WORKSPACE/../build -S $GITHUB_WORKSPACE
       - name: Build
-        run: cmake --build $GITHUB_WORKSPACE/build
+        run: cmake --build $GITHUB_WORKSPACE/../build
