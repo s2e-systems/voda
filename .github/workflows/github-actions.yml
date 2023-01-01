@@ -14,6 +14,6 @@ jobs:
       - name: pwd
         run: pwd
       - name: Configure CMake
-        run: cmake -B ${{runner.workspace}}/build -S ${{runner.workspace}}/projects
+        run: cmake -B $GITHUB_WORKSPACE/build -S $GITHUB_WORKSPACE/projects
       - name: Build
-        run: cmake --build ${{runner.workspace}}/build
+        run: cmake --build $GITHUB_WORKSPACE/build
