@@ -12,6 +12,4 @@ RUN rm -rf cyclonedds \
     && rm -rf cyclonedds-build \
     && rm -rf cyclonedds-cxx-build 
 RUN sudo apt-get update -y \
-	&& sudo apt-get install libgstreamer-plugins-base1.0-dev -y
-
-	
+    && sudo apt-get install libgstreamer-plugins-base1.0-dev -y
