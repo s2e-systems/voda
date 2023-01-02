@@ -1,0 +1,15 @@
+name: Build
+
+on: [push]
+
+jobs:
+  build:
+      runs-on: ubuntu-latest
+      container:
+        image: s2esystems/voda-build-environment:latest
+      steps:
+      - uses: actions/checkout@v3
+      - name: Configure CMake
+        run: cmake -B $GITHUB_WORKSPACE/../build -S $GITHUB_WORKSPACE
+      - name: Build
+        run: cmake --build $GITHUB_WORKSPACE/../build
