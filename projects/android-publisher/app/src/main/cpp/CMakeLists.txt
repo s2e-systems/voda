@@ -2,24 +2,22 @@ cmake_minimum_required(VERSION 3.18.1)
 
 project("android_publisher")
 
-
 find_library(log-lib log)
 
-####  DDS  ###
-
+# ###  DDS  ###
 set(CycloneDDS_DIR C:/Users/StefanKimmer/workcopies/build-cyclonedds/android_${ANDROID_ABI}/install/lib/cmake/CycloneDDS)
 set(CycloneDDS-CXX_DIR C:/Users/StefanKimmer/workcopies/build-cyclonedds-cxx/android_${ANDROID_ABI}/install/lib/cmake/CycloneDDS-CXX)
 find_package(CycloneDDS-CXX REQUIRED)
 
-
-###  GStreamer   ###
-
+# ##  GStreamer   ###
 set(gstreamer_abi_directory_name ${ANDROID_ABI})
-if (${ANDROID_ABI} STREQUAL armeabi-v7a)
-    set(gstreamer_abi_directory_name armv7)
+
+if(${ANDROID_ABI} STREQUAL armeabi-v7a)
+        set(gstreamer_abi_directory_name armv7)
 endif()
-if (${ANDROID_ABI} STREQUAL arm64-v8a)
-    set(gstreamer_abi_directory_name arm64)
+
+if(${ANDROID_ABI} STREQUAL arm64-v8a)
+        set(gstreamer_abi_directory_name arm64)
 endif()
 
 if(NOT DEFINED ENV{GSTREAMER_1_0_ROOT_ANDROID})
@@ -76,13 +74,13 @@ configure_file(
         ${gstreamer_path}/share/gst-android/ndk-build/gstreamer_android-1.0.c.in gstreamer_android-1.0.c
 )
 
-set_source_files_properties(gstreamer_android-1.0.c
-        PROPERTIES GENERATED TRUE)
-
 add_library(gstreamer_android SHARED
         gstreamer_android-1.0.c
-        dummy.cpp
-        )
+)
+
+set_target_properties(gstreamer_android PROPERTIES
+        LINKER_LANGUAGE CXX
+)
 
 target_link_libraries(gstreamer_android
         ${log-lib}
@@ -145,31 +143,28 @@ target_link_libraries(gstreamer_android
         ${gstreamer_path}/lib/libvorbisfile.a
         ${gstreamer_path}/lib/libvorbisidec.a
         ${gstreamer_path}/lib/libz.a
-        )
+)
 
 target_include_directories(gstreamer_android PUBLIC
         ${gstreamer_path}/include/gstreamer-1.0
         ${gstreamer_path}/include/glib-2.0
         ${gstreamer_path}/lib/glib-2.0/include
-        )
+)
 
-
-
-###  App  ###
-
-
+# ##  App  ###
 add_library(android_publisher SHARED
         native-lib.cpp
-#        native-dds-lib.cpp
+
+        # native-dds-lib.cpp
         VideoDDS.cpp
         VideoDDS.hpp
 )
 
-#idlcxx_generate(TARGET GeneratedIdl FILES ../common/VideoDDS.idl)
-
+# idlcxx_generate(TARGET GeneratedIdl FILES ../common/VideoDDS.idl)
 target_link_libraries(android_publisher
         CycloneDDS-CXX::ddscxx
         gstreamer_android
         android
-#    GeneratedIdl
+
+        # GeneratedIdl
 )

@@ -78,14 +78,12 @@ configure_file(
         ${gstreamer_path}/share/gst-android/ndk-build/gstreamer_android-1.0.c.in gstreamer_android-1.0.c
 )
 
-set_source_files_properties(gstreamer_android-1.0.c
-        PROPERTIES GENERATED TRUE)
-
 add_library(gstreamer_android SHARED
         gstreamer_android-1.0.c
-        dummy.cpp
         )
-
+set_target_properties(gstreamer_android PROPERTIES
+        LINKER_LANGUAGE CXX
+)
 target_link_libraries(gstreamer_android
         ${log-lib}
         EGL
