@@ -22,8 +22,11 @@ if (${ANDROID_ABI} STREQUAL arm64-v8a)
     set(gstreamer_abi_directory_name arm64)
 endif()
 
-set(gstreamer_path C:/gstreamer/1.0/android-universal-1.20.3)
+if(NOT DEFINED ENV{GSTREAMER_1_0_ROOT_ANDROID})
+        message(FATAL_ERROR "GSTREAMER_1_0_ROOT_ANDROID environment variable not set")
+endif()
 
+set(gstreamer_path $ENV{GSTREAMER_1_0_ROOT_ANDROID}/${gstreamer_abi_directory_name})
 
 set(PLUGINS_DECLARATION "
     GST_PLUGIN_STATIC_DECLARE(androidmedia);
@@ -72,7 +75,7 @@ set(G_IO_MODULES_DECLARE "")
 set(G_IO_MODULES_LOAD "")
 
 configure_file(
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/share/gst-android/ndk-build/gstreamer_android-1.0.c.in gstreamer_android-1.0.c
+        ${gstreamer_path}/share/gst-android/ndk-build/gstreamer_android-1.0.c.in gstreamer_android-1.0.c
 )
 
 set_source_files_properties(gstreamer_android-1.0.c
@@ -87,70 +90,70 @@ target_link_libraries(gstreamer_android
         ${log-lib}
         EGL
         OpenSLES
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstandroidmedia.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstapp.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstaudiofx.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstaudiofxbad.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstaudiotestsrc.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstautodetect.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstcamerabin.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstcoreelements.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgsteffectv.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstipcpipeline.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstivorbisdec.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstopengl.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstopenh264.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstopensles.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgsttypefindfunctions.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstvideoconvert.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstvideofilter.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstvideotestsrc.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstvideoparsersbad.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstvideorate.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/gstreamer-1.0/libgstvorbis.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libandroid_support.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libavcodec.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libavutil.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libffi.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgio-2.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libglib-2.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgmodule-2.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgobject-2.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgraphene-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstadaptivedemux-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstapp-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstaudio-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstbadaudio-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstbase-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstbasecamerabinsrc-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstcodecparsers-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstcodecs-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstcontroller-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstfft-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstgl-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstpbutils-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstphotography-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstreamer-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgsttag-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libgstvideo-1.0.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libiconv.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libintl.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libjpeg.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libopenh264.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/liborc-0.4.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libpng16.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libvo-aacenc.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libvorbis.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libvorbisenc.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libvorbisfile.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libvorbisidec.a
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/libz.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstandroidmedia.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstapp.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiofx.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiofxbad.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiotestsrc.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstautodetect.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstcamerabin.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstcoreelements.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgsteffectv.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstipcpipeline.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstivorbisdec.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstopengl.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstopenh264.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstopensles.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgsttypefindfunctions.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideoconvert.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideofilter.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideotestsrc.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideoparsersbad.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideorate.a
+        ${gstreamer_path}/lib/gstreamer-1.0/libgstvorbis.a
+        ${gstreamer_path}/lib/libandroid_support.a
+        ${gstreamer_path}/lib/libavcodec.a
+        ${gstreamer_path}/lib/libavutil.a
+        ${gstreamer_path}/lib/libffi.a
+        ${gstreamer_path}/lib/libgio-2.0.a
+        ${gstreamer_path}/lib/libglib-2.0.a
+        ${gstreamer_path}/lib/libgmodule-2.0.a
+        ${gstreamer_path}/lib/libgobject-2.0.a
+        ${gstreamer_path}/lib/libgraphene-1.0.a
+        ${gstreamer_path}/lib/libgstadaptivedemux-1.0.a
+        ${gstreamer_path}/lib/libgstapp-1.0.a
+        ${gstreamer_path}/lib/libgstaudio-1.0.a
+        ${gstreamer_path}/lib/libgstbadaudio-1.0.a
+        ${gstreamer_path}/lib/libgstbase-1.0.a
+        ${gstreamer_path}/lib/libgstbasecamerabinsrc-1.0.a
+        ${gstreamer_path}/lib/libgstcodecparsers-1.0.a
+        ${gstreamer_path}/lib/libgstcodecs-1.0.a
+        ${gstreamer_path}/lib/libgstcontroller-1.0.a
+        ${gstreamer_path}/lib/libgstfft-1.0.a
+        ${gstreamer_path}/lib/libgstgl-1.0.a
+        ${gstreamer_path}/lib/libgstpbutils-1.0.a
+        ${gstreamer_path}/lib/libgstphotography-1.0.a
+        ${gstreamer_path}/lib/libgstreamer-1.0.a
+        ${gstreamer_path}/lib/libgsttag-1.0.a
+        ${gstreamer_path}/lib/libgstvideo-1.0.a
+        ${gstreamer_path}/lib/libiconv.a
+        ${gstreamer_path}/lib/libintl.a
+        ${gstreamer_path}/lib/libjpeg.a
+        ${gstreamer_path}/lib/libopenh264.a
+        ${gstreamer_path}/lib/liborc-0.4.a
+        ${gstreamer_path}/lib/libpng16.a
+        ${gstreamer_path}/lib/libvo-aacenc.a
+        ${gstreamer_path}/lib/libvorbis.a
+        ${gstreamer_path}/lib/libvorbisenc.a
+        ${gstreamer_path}/lib/libvorbisfile.a
+        ${gstreamer_path}/lib/libvorbisidec.a
+        ${gstreamer_path}/lib/libz.a
         )
 
 target_include_directories(gstreamer_android PUBLIC
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/include/gstreamer-1.0
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/include/glib-2.0
-        ${gstreamer_path}/${gstreamer_abi_directory_name}/lib/glib-2.0/include
+        ${gstreamer_path}/include/gstreamer-1.0
+        ${gstreamer_path}/include/glib-2.0
+        ${gstreamer_path}/lib/glib-2.0/include
         )
 
 
