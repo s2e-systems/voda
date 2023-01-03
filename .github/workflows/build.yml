@@ -6,7 +6,10 @@ jobs:
   build:
       runs-on: ubuntu-latest
       container:
-        image: s2esystems/voda-build-environment:latest
+        image: 'ghcr.io/${{ github.repository }}:latest'
+        credentials:
+          username: ${{ github.ref }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       steps:
       - uses: actions/checkout@v3
       - name: Configure CMake
