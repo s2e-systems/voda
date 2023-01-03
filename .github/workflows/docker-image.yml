@@ -6,7 +6,7 @@ on:
       - ".github/workflows/docker-image.yml"
       - ".github/workflows/Dockerfile"
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build:
