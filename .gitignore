@@ -21,3 +21,4 @@ projects/android-subscriber/.gradle/
 projects/android-subscriber/.idea/
 projects/android-subscriber/.vscode/
 projects/subscriber/videolistener.cpp
+CMakeUserPresets.json

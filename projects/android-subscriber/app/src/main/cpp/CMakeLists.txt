@@ -2,24 +2,29 @@ cmake_minimum_required(VERSION 3.18.1)
 
 project("android_subscriber")
 
-
 find_library(log-lib log)
 
-####  DDS  ###
-
-set(CycloneDDS_DIR C:/Users/StefanKimmer/workcopies/build-cyclonedds/android_${ANDROID_ABI}/install/lib/cmake/CycloneDDS)
-set(CycloneDDS-CXX_DIR C:/Users/StefanKimmer/workcopies/build-cyclonedds-cxx/android_${ANDROID_ABI}/install/lib/cmake/CycloneDDS-CXX)
+# ###  DDS  ###
+if(NOT DEFINED ENV{CycloneDDS_ROOT_ANDROID})
+        message(FATAL_ERROR "CycloneDDS_ROOT_ANDROID environment variable not set")
+endif()
+if(NOT DEFINED ENV{CycloneDDS-CXX_ROOT_ANDROID})
+        message(FATAL_ERROR "CycloneDDS-CXX_ROOT_ANDROID environment variable not set")
+endif()
+set(CycloneDDS_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS)
+set(CycloneDDS-CXX_DIR $ENV{CycloneDDS-CXX_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS-CXX)
 find_package(CycloneDDS-CXX REQUIRED)
 
 
-###  GStreamer   ###
-
+# ##  GStreamer   ###
 set(gstreamer_abi_directory_name ${ANDROID_ABI})
-if (${ANDROID_ABI} STREQUAL armeabi-v7a)
-    set(gstreamer_abi_directory_name armv7)
+
+if(${ANDROID_ABI} STREQUAL armeabi-v7a)
+        set(gstreamer_abi_directory_name armv7)
 endif()
-if (${ANDROID_ABI} STREQUAL arm64-v8a)
-    set(gstreamer_abi_directory_name arm64)
+
+if(${ANDROID_ABI} STREQUAL arm64-v8a)
+        set(gstreamer_abi_directory_name arm64)
 endif()
 
 if(NOT DEFINED ENV{GSTREAMER_1_0_ROOT_ANDROID})
@@ -80,7 +85,7 @@ configure_file(
 
 add_library(gstreamer_android SHARED
         gstreamer_android-1.0.c
-        )
+)
 set_target_properties(gstreamer_android PROPERTIES
         LINKER_LANGUAGE CXX
 )
@@ -146,31 +151,32 @@ target_link_libraries(gstreamer_android
         ${gstreamer_path}/lib/libvorbisfile.a
         ${gstreamer_path}/lib/libvorbisidec.a
         ${gstreamer_path}/lib/libz.a
-        )
+)
 
 target_include_directories(gstreamer_android PUBLIC
         ${gstreamer_path}/include/gstreamer-1.0
         ${gstreamer_path}/include/glib-2.0
         ${gstreamer_path}/lib/glib-2.0/include
-        )
+)
 
-
-
-###  App  ###
-
-
+# ##  App  ###
 add_library(android_subscriber SHARED
         native-lib.cpp
-#        native-dds-lib.cpp
         VideoDDS.cpp
         VideoDDS.hpp
 )
 
-#idlcxx_generate(TARGET GeneratedIdl FILES ../common/VideoDDS.idl)
+SET(CMAKE_FIND_LIBRARY_PREFIXES__BACKUP ${CMAKE_FIND_LIBRARY_PREFIXES})
+SET(CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
+list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
+SET(CMAKE_FIND_LIBRARY_PREFIXES ${CMAKE_FIND_LIBRARY_PREFIXES__BACKUP})
+SET(CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP})
 
 target_link_libraries(android_subscriber
         CycloneDDS-CXX::ddscxx
         gstreamer_android
         android
-#    GeneratedIdl
+        GeneratedIdl
 )
