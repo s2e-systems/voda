@@ -1,30 +1,3 @@
-
-Skip to content
-Pull requests
-Issues
-Codespaces
-Marketplace
-Explore
-@stkimmer
-s2e-systems /
-voda
-Public
-
-Code
-Pull requests
-Actions
-Security
-Insights
-
-    Settings
-
-voda/CMakeLists.txt
-@stkimmer
-stkimmer Add workflow yaml (#6)
-Latest commit ce2344d Jan 2, 2023
-History
-1 contributor
-98 lines (86 sloc) 3.32 KB
 cmake_minimum_required(VERSION 3.14.0)
 project(VoDA LANGUAGES CXX)
 
@@ -123,20 +96,3 @@ if(${BUILD_UNIT_TESTS})
                                                     GStreamer::gstreamer)
 
 endif()
-Footer
-© 2023 GitHub, Inc.
-Footer navigation
-
-    Terms
-    Privacy
-    Security
-    Status
-    Docs
-    Contact GitHub
-    Pricing
-    API
-    Training
-    Blog
-    About
-
-voda/CMakeLists.txt at master · s2e-systems/voda
