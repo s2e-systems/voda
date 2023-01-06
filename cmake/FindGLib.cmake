@@ -4,6 +4,7 @@ list(APPEND GLib_ROOT_SEARCH_PATHS ${GLib_RootSearchPath})
 
 # On Windows the glib is delivered with a GStreamer instalation,
 # hence add this to the root search path
+list(APPEND GLib_ROOT_SEARCH_PATHS $ENV{GSTREAMER_1_0_ROOT_MINGW_X86_64})
 list(APPEND GLib_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86_64})
 list(APPEND GLib_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86})
 

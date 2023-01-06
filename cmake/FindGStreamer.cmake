@@ -3,6 +3,7 @@ set(GStreamer_RootSearchPath "" CACHE PATH "Additional root path to search GStre
 
 list(APPEND GStreamer_ROOT_SEARCH_PATHS ${GStreamer_RootSearchPath})
 
+list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GSTREAMER_1_0_ROOT_MINGW_X86_64})
 list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86_64})
 list(APPEND GStreamer_ROOT_SEARCH_PATHS $ENV{GStreamer_1_0_ROOT_X86})
 

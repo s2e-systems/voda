@@ -1,9 +1,0 @@
-emulator -avd Pixel_5_API_29 -port 5554 -qemu -device virtio-net-pci,netdev=eth1 -netdev tap,id=eth1,ifname=tap0,script=no
-emulator -avd Nexus_4_API_29 -port 5556 -qemu -device virtio-net-pci,netdev=eth1 -netdev tap,id=eth1,ifname=tap1,script=no
-
-adb -s emulator-5554 install -r .\android-publisher\app\build\outputs\apk\debug\app-debug.apk
-adb -s emulator-5556 install -r .\android-subscriber\app\build\outputs\apk\debug\app-debug.apk
-
-adb -s emulator-5554 shell am start -n "com.publisher/mainactivity.MainActivity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
-adb -s emulator-5556 shell am start -n "com.subscriber/mainactivity.MainActivity" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER
-
