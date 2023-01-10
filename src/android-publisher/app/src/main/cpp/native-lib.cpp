@@ -318,6 +318,9 @@ app_function (void *userdata)
         dataWriterQos << dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(5000));
         dataWriterQos << dds::core::policy::OwnershipStrength(1000);
         data_writer = new DataWriter<S2E::Video>{publisher, topic, dataWriterQos};
+    } catch (const dds::core::Exception& e) {
+        GST_ERROR ("Could not create DDS with %s", e.what());
+        return NULL;
     } catch (...) {
         GST_ERROR ("Could not create DDS stuff");
         return NULL;

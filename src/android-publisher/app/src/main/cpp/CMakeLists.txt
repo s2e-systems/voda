@@ -8,11 +8,9 @@ find_library(log-lib log)
 if(NOT DEFINED ENV{CycloneDDS_ROOT_ANDROID})
         message(FATAL_ERROR "CycloneDDS_ROOT_ANDROID environment variable not set")
 endif()
-if(NOT DEFINED ENV{CycloneDDS-CXX_ROOT_ANDROID})
-        message(FATAL_ERROR "CycloneDDS-CXX_ROOT_ANDROID environment variable not set")
-endif()
 set(CycloneDDS_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS)
-set(CycloneDDS-CXX_DIR $ENV{CycloneDDS-CXX_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS-CXX)
+set(CycloneDDS-CXX_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS-CXX)
+
 find_package(CycloneDDS-CXX REQUIRED)
 
 # ##  GStreamer   ###
@@ -164,17 +162,17 @@ add_library(android_publisher SHARED
         VideoDDS.hpp
 )
 
-SET(CMAKE_FIND_LIBRARY_PREFIXES__BACKUP ${CMAKE_FIND_LIBRARY_PREFIXES})
-SET(CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
-list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
-list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
-SET(CMAKE_FIND_LIBRARY_PREFIXES ${CMAKE_FIND_LIBRARY_PREFIXES__BACKUP})
-SET(CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP})
+#SET(CMAKE_FIND_LIBRARY_PREFIXES__BACKUP ${CMAKE_FIND_LIBRARY_PREFIXES})
+#SET(CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+#list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
+#list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+#idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
+#SET(CMAKE_FIND_LIBRARY_PREFIXES ${CMAKE_FIND_LIBRARY_PREFIXES__BACKUP})
+#SET(CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP})
 
 target_link_libraries(android_publisher
         CycloneDDS-CXX::ddscxx
         gstreamer_android
         android
-        GeneratedIdl
+#        GeneratedIdl
 )
