@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    // Determines the version of Android SDK Platform
     compileSdk 33
 
     defaultConfig {

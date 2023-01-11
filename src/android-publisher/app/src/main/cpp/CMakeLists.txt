@@ -13,6 +13,13 @@ set(CycloneDDS-CXX_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/Cy
 
 find_package(CycloneDDS-CXX REQUIRED)
 
+# On a Windows host the _idlcxx_shared_lib cycloneddsidlcxx can not be found since
+# only ".so" files with the "lib" prefix ae searched
+list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
+list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
+
+
 # ##  GStreamer   ###
 set(gstreamer_abi_directory_name ${ANDROID_ABI})
 
@@ -33,9 +40,6 @@ set(gstreamer_path $ENV{GSTREAMER_1_0_ROOT_ANDROID}/${gstreamer_abi_directory_na
 set(PLUGINS_DECLARATION "
     GST_PLUGIN_STATIC_DECLARE(androidmedia);
     GST_PLUGIN_STATIC_DECLARE(app);
-    GST_PLUGIN_STATIC_DECLARE(audiofx);
-    GST_PLUGIN_STATIC_DECLARE(audiofxbad);
-    GST_PLUGIN_STATIC_DECLARE(audiotestsrc);
     GST_PLUGIN_STATIC_DECLARE(autodetect);
     GST_PLUGIN_STATIC_DECLARE(camerabin);
     GST_PLUGIN_STATIC_DECLARE(coreelements);
@@ -53,9 +57,6 @@ set(PLUGINS_DECLARATION "
 set(PLUGINS_REGISTRATION "
     GST_PLUGIN_STATIC_REGISTER(androidmedia);
     GST_PLUGIN_STATIC_REGISTER(app);
-    GST_PLUGIN_STATIC_REGISTER(audiofx);
-    GST_PLUGIN_STATIC_REGISTER(audiofxbad);
-    GST_PLUGIN_STATIC_REGISTER(audiotestsrc);
     GST_PLUGIN_STATIC_REGISTER(autodetect);
     GST_PLUGIN_STATIC_REGISTER(camerabin);
     GST_PLUGIN_STATIC_REGISTER(coreelements);
@@ -90,11 +91,9 @@ target_link_libraries(gstreamer_android
         ${log-lib}
         EGL
         OpenSLES
+        # ahcsrc:
         ${gstreamer_path}/lib/gstreamer-1.0/libgstandroidmedia.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstapp.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiofx.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiofxbad.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiotestsrc.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstautodetect.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstcamerabin.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstcoreelements.a
@@ -162,17 +161,9 @@ add_library(android_publisher SHARED
         VideoDDS.hpp
 )
 
-#SET(CMAKE_FIND_LIBRARY_PREFIXES__BACKUP ${CMAKE_FIND_LIBRARY_PREFIXES})
-#SET(CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
-#list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
-#list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-#idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
-#SET(CMAKE_FIND_LIBRARY_PREFIXES ${CMAKE_FIND_LIBRARY_PREFIXES__BACKUP})
-#SET(CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP})
-
 target_link_libraries(android_publisher
         CycloneDDS-CXX::ddscxx
         gstreamer_android
         android
-#        GeneratedIdl
+        GeneratedIdl
 )
