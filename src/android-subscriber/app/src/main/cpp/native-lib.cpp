@@ -327,7 +327,7 @@ app_function (void *userdata)
 //    GstElement* caps_filter = gst_bin_get_by_name(GST_BIN(data->pipeline), "caps_filter");
 //    g_object_set(caps_filter, "caps", sink_caps, nullptr);
 
-   putenv("CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface name=\"eth1\" presence_required=\"false\"/></Interfaces></General></Domain></CycloneDDS>");
+   putenv("CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface name=\"eth1\" /></Interfaces></General></Domain></CycloneDDS>");
     try {
         DomainParticipant* domain_participant = new DomainParticipant;
         const dds::topic::qos::TopicQos topicQos{domain_participant->dp.default_topic_qos()};
@@ -345,6 +345,9 @@ app_function (void *userdata)
         video_listener = new VideoListener(GST_APP_SRC_CAST(app_src));
         data_reader = new DataReader<S2E::Video>{subscriber, topic, dataReaderQos, video_listener, mask};
 
+    } catch (const dds::core::Exception& e) {
+        GST_ERROR ("Could not create DDS with %s", e.what());
+        return NULL;
     } catch (...) {
         GST_ERROR("Could not create DDS stuff");
         return NULL;

@@ -8,12 +8,15 @@ find_library(log-lib log)
 if(NOT DEFINED ENV{CycloneDDS_ROOT_ANDROID})
         message(FATAL_ERROR "CycloneDDS_ROOT_ANDROID environment variable not set")
 endif()
-if(NOT DEFINED ENV{CycloneDDS-CXX_ROOT_ANDROID})
-        message(FATAL_ERROR "CycloneDDS-CXX_ROOT_ANDROID environment variable not set")
-endif()
 set(CycloneDDS_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS)
-set(CycloneDDS-CXX_DIR $ENV{CycloneDDS-CXX_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS-CXX)
+set(CycloneDDS-CXX_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS-CXX)
 find_package(CycloneDDS-CXX REQUIRED)
+
+# On a Windows host the _idlcxx_shared_lib cycloneddsidlcxx can not be found since
+# only ".so" files with the "lib" prefix ae searched
+list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
+list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
 
 
 # ##  GStreamer   ###
@@ -34,46 +37,20 @@ endif()
 set(gstreamer_path $ENV{GSTREAMER_1_0_ROOT_ANDROID}/${gstreamer_abi_directory_name})
 
 set(PLUGINS_DECLARATION "
-    GST_PLUGIN_STATIC_DECLARE(androidmedia);
     GST_PLUGIN_STATIC_DECLARE(app);
-    GST_PLUGIN_STATIC_DECLARE(audiofx);
-    GST_PLUGIN_STATIC_DECLARE(audiofxbad);
-    GST_PLUGIN_STATIC_DECLARE(audiotestsrc);
     GST_PLUGIN_STATIC_DECLARE(autodetect);
-    GST_PLUGIN_STATIC_DECLARE(camerabin);
     GST_PLUGIN_STATIC_DECLARE(coreelements);
-    GST_PLUGIN_STATIC_DECLARE(effectv);
-    GST_PLUGIN_STATIC_DECLARE(ipcpipeline);
     GST_PLUGIN_STATIC_DECLARE(opengl);
     GST_PLUGIN_STATIC_DECLARE(openh264);
-    GST_PLUGIN_STATIC_DECLARE(opensles);
-    GST_PLUGIN_STATIC_DECLARE(typefindfunctions);
     GST_PLUGIN_STATIC_DECLARE(videoconvert);
-    GST_PLUGIN_STATIC_DECLARE(videofilter);
-    GST_PLUGIN_STATIC_DECLARE(videotestsrc);
-    GST_PLUGIN_STATIC_DECLARE(videoparsersbad);
-    GST_PLUGIN_STATIC_DECLARE(videorate);
 ")
 set(PLUGINS_REGISTRATION "
-    GST_PLUGIN_STATIC_REGISTER(androidmedia);
     GST_PLUGIN_STATIC_REGISTER(app);
-    GST_PLUGIN_STATIC_REGISTER(audiofx);
-    GST_PLUGIN_STATIC_REGISTER(audiofxbad);
-    GST_PLUGIN_STATIC_REGISTER(audiotestsrc);
     GST_PLUGIN_STATIC_REGISTER(autodetect);
-    GST_PLUGIN_STATIC_REGISTER(camerabin);
     GST_PLUGIN_STATIC_REGISTER(coreelements);
-    GST_PLUGIN_STATIC_REGISTER(effectv);
-    GST_PLUGIN_STATIC_REGISTER(ipcpipeline);
     GST_PLUGIN_STATIC_REGISTER(opengl);
     GST_PLUGIN_STATIC_REGISTER(openh264);
-    GST_PLUGIN_STATIC_REGISTER(opensles);
-    GST_PLUGIN_STATIC_REGISTER(typefindfunctions);
     GST_PLUGIN_STATIC_REGISTER(videoconvert);
-    GST_PLUGIN_STATIC_REGISTER(videofilter);
-    GST_PLUGIN_STATIC_REGISTER(videotestsrc);
-    GST_PLUGIN_STATIC_REGISTER(videoparsersbad);
-    GST_PLUGIN_STATIC_REGISTER(videorate);
 ")
 
 set(G_IO_MODULES_DECLARE "")
@@ -92,50 +69,23 @@ set_target_properties(gstreamer_android PROPERTIES
 target_link_libraries(gstreamer_android
         ${log-lib}
         EGL
-        OpenSLES
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstandroidmedia.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstapp.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiofx.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiofxbad.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstaudiotestsrc.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstautodetect.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstcamerabin.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstcoreelements.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgsteffectv.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstipcpipeline.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstivorbisdec.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstopengl.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstopenh264.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstopensles.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgsttypefindfunctions.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstvideoconvert.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideofilter.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideotestsrc.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideoparsersbad.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideorate.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstvorbis.a
-        ${gstreamer_path}/lib/libandroid_support.a
-        ${gstreamer_path}/lib/libavcodec.a
-        ${gstreamer_path}/lib/libavutil.a
         ${gstreamer_path}/lib/libffi.a
         ${gstreamer_path}/lib/libgio-2.0.a
         ${gstreamer_path}/lib/libglib-2.0.a
         ${gstreamer_path}/lib/libgmodule-2.0.a
         ${gstreamer_path}/lib/libgobject-2.0.a
         ${gstreamer_path}/lib/libgraphene-1.0.a
-        ${gstreamer_path}/lib/libgstadaptivedemux-1.0.a
         ${gstreamer_path}/lib/libgstapp-1.0.a
-        ${gstreamer_path}/lib/libgstaudio-1.0.a
-        ${gstreamer_path}/lib/libgstbadaudio-1.0.a
         ${gstreamer_path}/lib/libgstbase-1.0.a
-        ${gstreamer_path}/lib/libgstbasecamerabinsrc-1.0.a
-        ${gstreamer_path}/lib/libgstcodecparsers-1.0.a
-        ${gstreamer_path}/lib/libgstcodecs-1.0.a
         ${gstreamer_path}/lib/libgstcontroller-1.0.a
-        ${gstreamer_path}/lib/libgstfft-1.0.a
         ${gstreamer_path}/lib/libgstgl-1.0.a
         ${gstreamer_path}/lib/libgstpbutils-1.0.a
-        ${gstreamer_path}/lib/libgstphotography-1.0.a
         ${gstreamer_path}/lib/libgstreamer-1.0.a
         ${gstreamer_path}/lib/libgsttag-1.0.a
         ${gstreamer_path}/lib/libgstvideo-1.0.a
@@ -145,11 +95,6 @@ target_link_libraries(gstreamer_android
         ${gstreamer_path}/lib/libopenh264.a
         ${gstreamer_path}/lib/liborc-0.4.a
         ${gstreamer_path}/lib/libpng16.a
-        ${gstreamer_path}/lib/libvo-aacenc.a
-        ${gstreamer_path}/lib/libvorbis.a
-        ${gstreamer_path}/lib/libvorbisenc.a
-        ${gstreamer_path}/lib/libvorbisfile.a
-        ${gstreamer_path}/lib/libvorbisidec.a
         ${gstreamer_path}/lib/libz.a
 )
 
@@ -165,14 +110,6 @@ add_library(android_subscriber SHARED
         VideoDDS.cpp
         VideoDDS.hpp
 )
-
-SET(CMAKE_FIND_LIBRARY_PREFIXES__BACKUP ${CMAKE_FIND_LIBRARY_PREFIXES})
-SET(CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
-list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
-list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
-SET(CMAKE_FIND_LIBRARY_PREFIXES ${CMAKE_FIND_LIBRARY_PREFIXES__BACKUP})
-SET(CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES__BACKUP})
 
 target_link_libraries(android_subscriber
         CycloneDDS-CXX::ddscxx

@@ -7,4 +7,4 @@ src/android-publisher/app/.cxx
 src/android-subscriber/.gradle
 src/android-subscriber/.idea
 src/android-subscriber/app/.cxx
-src/android-publisher/local.properties
+local.properties
