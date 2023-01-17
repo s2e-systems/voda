@@ -8,3 +8,4 @@ src/android-subscriber/.gradle
 src/android-subscriber/.idea
 src/android-subscriber/app/.cxx
 local.properties
+.editorconfig
