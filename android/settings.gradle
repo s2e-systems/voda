@@ -13,4 +13,5 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Android Video over DDS"
-include ':app'
+include ':src:subscriber'
+include ':src:publisher'

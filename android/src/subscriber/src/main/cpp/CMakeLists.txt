@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18.1)
 
-project("android_publisher")
+project("android_subscriber")
 
 find_library(log-lib log)
 
@@ -10,14 +10,13 @@ if(NOT DEFINED ENV{CycloneDDS_ROOT_ANDROID})
 endif()
 set(CycloneDDS_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS)
 set(CycloneDDS-CXX_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS-CXX)
-
 find_package(CycloneDDS-CXX REQUIRED)
 
 # On a Windows host the _idlcxx_shared_lib cycloneddsidlcxx can not be found since
 # only ".so" files with the "lib" prefix ae searched
 list(APPEND CMAKE_FIND_LIBRARY_PREFIXES "")
 list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
+idlcxx_generate(TARGET GeneratedIdl FILES ../../../../../../src/common/VideoDDS.idl DEFAULT_EXTENSIBILITY final)
 
 
 # ##  GStreamer   ###
@@ -38,27 +37,20 @@ endif()
 set(gstreamer_path $ENV{GSTREAMER_1_0_ROOT_ANDROID}/${gstreamer_abi_directory_name})
 
 set(PLUGINS_DECLARATION "
-    // ahcsrc:
-    GST_PLUGIN_STATIC_DECLARE(androidmedia);
     GST_PLUGIN_STATIC_DECLARE(app);
     GST_PLUGIN_STATIC_DECLARE(autodetect);
     GST_PLUGIN_STATIC_DECLARE(coreelements);
     GST_PLUGIN_STATIC_DECLARE(opengl);
     GST_PLUGIN_STATIC_DECLARE(openh264);
     GST_PLUGIN_STATIC_DECLARE(videoconvert);
-    GST_PLUGIN_STATIC_DECLARE(videotestsrc);
-    GST_PLUGIN_STATIC_DECLARE(videorate);
 ")
 set(PLUGINS_REGISTRATION "
-    GST_PLUGIN_STATIC_REGISTER(androidmedia);
     GST_PLUGIN_STATIC_REGISTER(app);
     GST_PLUGIN_STATIC_REGISTER(autodetect);
     GST_PLUGIN_STATIC_REGISTER(coreelements);
     GST_PLUGIN_STATIC_REGISTER(opengl);
     GST_PLUGIN_STATIC_REGISTER(openh264);
     GST_PLUGIN_STATIC_REGISTER(videoconvert);
-    GST_PLUGIN_STATIC_REGISTER(videotestsrc);
-    GST_PLUGIN_STATIC_REGISTER(videorate);
 ")
 
 set(G_IO_MODULES_DECLARE "")
@@ -71,23 +63,18 @@ configure_file(
 add_library(gstreamer_android SHARED
         gstreamer_android-1.0.c
 )
-
 set_target_properties(gstreamer_android PROPERTIES
         LINKER_LANGUAGE CXX
 )
-
 target_link_libraries(gstreamer_android
         ${log-lib}
         EGL
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstandroidmedia.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstapp.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstautodetect.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstcoreelements.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstopengl.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstopenh264.a
         ${gstreamer_path}/lib/gstreamer-1.0/libgstvideoconvert.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideotestsrc.a
-        ${gstreamer_path}/lib/gstreamer-1.0/libgstvideorate.a
         ${gstreamer_path}/lib/libffi.a
         ${gstreamer_path}/lib/libgio-2.0.a
         ${gstreamer_path}/lib/libglib-2.0.a
@@ -95,12 +82,10 @@ target_link_libraries(gstreamer_android
         ${gstreamer_path}/lib/libgobject-2.0.a
         ${gstreamer_path}/lib/libgraphene-1.0.a
         ${gstreamer_path}/lib/libgstapp-1.0.a
-        ${gstreamer_path}/lib/libgstaudio-1.0.a
         ${gstreamer_path}/lib/libgstbase-1.0.a
         ${gstreamer_path}/lib/libgstcontroller-1.0.a
         ${gstreamer_path}/lib/libgstgl-1.0.a
         ${gstreamer_path}/lib/libgstpbutils-1.0.a
-        ${gstreamer_path}/lib/libgstphotography-1.0.a
         ${gstreamer_path}/lib/libgstreamer-1.0.a
         ${gstreamer_path}/lib/libgsttag-1.0.a
         ${gstreamer_path}/lib/libgstvideo-1.0.a
@@ -120,13 +105,13 @@ target_include_directories(gstreamer_android PUBLIC
 )
 
 # ##  App  ###
-add_library(android_publisher SHARED
+add_library(android_subscriber SHARED
         native-lib.cpp
         VideoDDS.cpp
         VideoDDS.hpp
 )
 
-target_link_libraries(android_publisher
+target_link_libraries(android_subscriber
         CycloneDDS-CXX::ddscxx
         gstreamer_android
         android

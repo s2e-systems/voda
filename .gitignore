@@ -1,11 +1,9 @@
 .vscode
 CMakeUserPresets.json
 build
-src/android-publisher/.gradle
-src/android-publisher/.idea
-src/android-publisher/app/.cxx
-src/android-subscriber/.gradle
-src/android-subscriber/.idea
-src/android-subscriber/app/.cxx
+android/.gradle
+android/.idea
+android/.build-ndk
+android/.build-gradle
 local.properties
 .editorconfig
