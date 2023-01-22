@@ -12,6 +12,6 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "Android Video over DDS"
+rootProject.name = "VoDA"
 include ':src:subscriber'
 include ':src:publisher'
