@@ -2,7 +2,6 @@ package mainactivity;
 
 import android.os.Bundle;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import mainactivity.databinding.ActivityMainBinding;
 
@@ -10,32 +9,25 @@ import android.app.Activity;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.View;
-import android.view.View.OnClickListener;
-import android.widget.ImageButton;
 
 
 import org.freedesktop.gstreamer.GStreamer;
 
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback {
-//    private native String nativeDdsInit();
      private native void nativeInit();
-     private native void nativeFinalize(); // Destroy pipeline and shutdown native code
-     private native void nativePlay();     // Set pipeline to PLAYING
-     private native void nativePause();    // Set pipeline to PAUSED
-     private static native boolean nativeClassInit(); // Initialize native class: cache Method IDs for callbacks
+     private native void nativeFinalize();
+     private native void nativePlay();
+     private static native boolean nativeClassInit();
      private native void nativeSurfaceInit(Object surface);
      private native void nativeSurfaceFinalize();
      private long native_custom_data;      // Native code will use this to keep private data
-
-     private boolean is_playing_desired;   // Whether the user asked to go to PLAYING
 
     private ActivityMainBinding binding;
 
     static {
          System.loadLibrary("gstreamer_android");
-        System.loadLibrary("android_publisher");
+         System.loadLibrary("android_publisher");
          nativeClassInit();
     }
 
@@ -44,62 +36,22 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     {
         super.onCreate(savedInstanceState);
 
-         try {
-             GStreamer.init(this);
-         } catch (Exception e) {
-             Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
-             finish();
-             return;
-         }
-
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        final TextView tv = binding.textviewMessage;
-        tv.setText("starting ... ");
+        binding.textviewMessage.setText("starting ... ");
 
-//        String ret = nativeDdsInit();
-//        tv.setText(ret);
-//        Toast.makeText(this, ret, Toast.LENGTH_LONG).show();
+         try {
+             GStreamer.init(this);
+             SurfaceView sv = binding.surfaceVideo;
+             SurfaceHolder sh = sv.getHolder();
+             sh.addCallback(this);
 
-         ImageButton play = binding.buttonPlay;
-         play.setOnClickListener(new OnClickListener() {
-             public void onClick(View v) {
-                 is_playing_desired = true;
-                 nativePlay();
-             }
-         });
+             nativeInit();
 
-         ImageButton pause = binding.buttonStop;
-         pause.setOnClickListener(new OnClickListener() {
-             public void onClick(View v) {
-                 is_playing_desired = false;
-                 nativePause();
-             }
-         });
-
-         SurfaceView sv = binding.surfaceVideo;
-         SurfaceHolder sh = sv.getHolder();
-         sh.addCallback(this);
-
-         if (savedInstanceState != null) {
-             is_playing_desired = savedInstanceState.getBoolean("playing");
-             Log.i ("GStreamer", "Activity created. Saved state is playing:" + is_playing_desired);
-         } else {
-             is_playing_desired = false;
-             Log.i ("GStreamer", "Activity created. There is no saved state, playing: false");
+         } catch (Exception e) {
+             binding.textviewMessage.setText("Failed intializing gstreamer:" + e.getMessage());
          }
-
-         // Start with disabled buttons, until native code is initialized
-         binding.buttonPlay.setEnabled(false);
-         binding.buttonStop.setEnabled(false);
-
-         nativeInit();
-     }
-
-     protected void onSaveInstanceState (Bundle outState) {
-         Log.d ("GStreamer", "Saving state, playing:" + is_playing_desired);
-         outState.putBoolean("playing", is_playing_desired);
      }
 
      protected void onDestroy() {
@@ -123,17 +75,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
          final TextView tv = binding.textviewMessage;
          tv.setText("GStreamer initialized");
          Log.i ("GStreamer", "Gst initialized. Start playing");
-         nativePlay();
 
-         // Re-enable buttons, now that GStreamer is initialized
-         final Activity activity = this;
-         runOnUiThread(new Runnable() {
-             public void run() {
-                 binding.buttonPlay.setEnabled(true);
-                 binding.buttonStop.setEnabled(true);
-             }
-         });
-        }
+         nativePlay();
+    }
 
 
 
