@@ -63,9 +63,6 @@ typedef struct _CustomData
 static pthread_t gst_app_thread;
 static pthread_key_t current_jni_env;
 static JavaVM* java_vm;
-static jfieldID custom_data_field_id;
-static jmethodID set_message_method_id;
-static jmethodID on_gstreamer_initialized_method_id;
 
 /*
  * Private methods
@@ -120,6 +117,10 @@ set_ui_message(const gchar* message, CustomData* data)
     JNIEnv* env = get_jni_env();
     GST_DEBUG("Setting message to: %s", message);
     jstring jmessage = env->NewStringUTF(message);
+
+    jmethodID set_message_method_id =
+            env->GetMethodID(env->GetObjectClass(data->app), "setMessage", "(Ljava/lang/String;)V");
+
     env->CallVoidMethod(data->app, set_message_method_id, jmessage);
     if (env->ExceptionCheck()) {
         GST_ERROR("Failed to call Java method");
@@ -176,6 +177,9 @@ check_initialization_complete(CustomData* data)
         /* The main loop is running and we received a native window, inform the sink about it */
         gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
             (guintptr)data->native_window);
+
+        jmethodID on_gstreamer_initialized_method_id =
+                env->GetMethodID(env->GetObjectClass(data->app), "onGStreamerInitialized", "()V");
 
         env->CallVoidMethod(data->app, on_gstreamer_initialized_method_id);
         if (env->ExceptionCheck()) {
@@ -382,9 +386,11 @@ app_function(void* userdata)
 
  /* Instruct the native code to create its internal data structure, pipeline and thread */
 extern "C" JNIEXPORT void JNICALL
-Java_mainactivity_MainActivity_nativeInit(JNIEnv * env, jobject thiz)
+nativeInit(JNIEnv * env, jobject thiz)
 {
     CustomData* data = g_new0(CustomData, 1);
+    jfieldID custom_data_field_id =
+            env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     SET_CUSTOM_DATA(env, thiz, custom_data_field_id, data);
     GST_DEBUG_CATEGORY_INIT(debug_category, "MyGstreamerBuild", 0,
         "Android MyGstreamerBuild");
@@ -398,8 +404,10 @@ Java_mainactivity_MainActivity_nativeInit(JNIEnv * env, jobject thiz)
 
 /* Quit the main loop, remove the native thread and free resources */
 extern "C" JNIEXPORT void JNICALL
-Java_mainactivity_MainActivity_nativeFinalize(JNIEnv * env, jobject thiz)
+nativeFinalize(JNIEnv * env, jobject thiz)
 {
+    jfieldID custom_data_field_id =
+            env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
     if (!data)
         return;
@@ -421,53 +429,22 @@ Java_mainactivity_MainActivity_nativeFinalize(JNIEnv * env, jobject thiz)
 
 /* Set pipeline to PLAYING state */
 extern "C" JNIEXPORT void JNICALL
-Java_mainactivity_MainActivity_nativePlay(JNIEnv * env, jobject thiz)
+nativePlay(JNIEnv * env, jobject thiz)
 {
-    CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
+    jfieldID custom_data_field_id =
+            env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
+    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
     if (!data)
         return;
     GST_DEBUG("Setting state to PLAYING");
     gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
 }
 
-/* Set pipeline to PAUSED state */
 extern "C" JNIEXPORT void JNICALL
-Java_mainactivity_MainActivity_nativePause(JNIEnv * env, jobject thiz)
+nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
 {
-    CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
-    if (!data)
-        return;
-    GST_DEBUG("Setting state to PAUSED");
-    gst_element_set_state(data->pipeline, GST_STATE_PAUSED);
-}
-
-
-/* Static class initializer: retrieve method and field IDs */
-extern "C" JNIEXPORT jboolean JNICALL
-Java_mainactivity_MainActivity_nativeClassInit(JNIEnv * env, jclass klass)
-{
-    custom_data_field_id =
-        env->GetFieldID(klass, "native_custom_data", "J");
-    set_message_method_id =
-        env->GetMethodID(klass, "setMessage", "(Ljava/lang/String;)V");
-    on_gstreamer_initialized_method_id =
-        env->GetMethodID(klass, "onGStreamerInitialized", "()V");
-
-    if (!custom_data_field_id || !set_message_method_id
-        || !on_gstreamer_initialized_method_id) {
-        /* We emit this message through the Android log instead of the GStreamer log because the later
-         * has not been initialized yet.
-         */
-        __android_log_print(ANDROID_LOG_ERROR, "DDS",
-            "The calling class does not implement all necessary interface methods");
-        return JNI_FALSE;
-    }
-    return JNI_TRUE;
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_mainactivity_MainActivity_nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
-{
+    jfieldID custom_data_field_id =
+            env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
     if (!data)
         return;
@@ -498,8 +475,10 @@ Java_mainactivity_MainActivity_nativeSurfaceInit(JNIEnv * env, jobject thiz, job
 
 
 extern "C" JNIEXPORT void JNICALL
-Java_mainactivity_MainActivity_nativeSurfaceFinalize(JNIEnv * env, jobject thiz)
+nativeSurfaceFinalize(JNIEnv * env, jobject thiz)
 {
+    jfieldID custom_data_field_id =
+            env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
     if (!data)
         return;
@@ -516,26 +495,28 @@ Java_mainactivity_MainActivity_nativeSurfaceFinalize(JNIEnv * env, jobject thiz)
     data->initialized = FALSE;
 }
 
-/* Library initializer */
-jint
-JNI_OnLoad(JavaVM* vm, void* reserved)
-{
-    JNIEnv* env = NULL;
 
+jint JNI_OnLoad(JavaVM* vm, void* reserved)
+{
     java_vm = vm;
 
+    JNIEnv* env = NULL;
     if (vm->GetEnv((void**)&env, JNI_VERSION_1_4) != JNI_OK) {
-        __android_log_print(ANDROID_LOG_ERROR, "MyGstreamerBuild",
-            "Could not retrieve JNIEnv");
-        return 0;
+        return JNI_ERR;
     }
 
-    //putenv(R"(GST_DEBUG=ahcsrc:6)");
+    jclass c = env->FindClass("mainactivity/MainActivity");
+    if (c == nullptr) return JNI_ERR;
 
-//    jclass klass = (*env)->FindClass (env,
-//                                      "org/freedesktop/gstreamer/tutorials/tutorial_3/Tutorial3");
-//    (*env)->RegisterNatives (env, klass, native_methods,
-//                             G_N_ELEMENTS (native_methods));
+    static const JNINativeMethod methods[] = {
+    {"nativeInit", "()V", reinterpret_cast<void*>(nativeInit)},
+    {"nativeFinalize", "()V", reinterpret_cast<void*>(nativeFinalize)},
+    {"nativePlay", "()V", reinterpret_cast<void*>(nativePlay)},
+    {"nativeSurfaceInit", "(Ljava/lang/Object;)V", reinterpret_cast<void*>(nativeSurfaceInit)},
+    {"nativeSurfaceFinalize", "()V", reinterpret_cast<void*>(nativeSurfaceFinalize)},
+    };
+    int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
+    if (rc != JNI_OK) return rc;
 
     pthread_key_create(&current_jni_env, detach_current_thread);
 

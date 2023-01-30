@@ -18,7 +18,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
      private native void nativeInit();
      private native void nativeFinalize();
      private native void nativePlay();
-     private static native boolean nativeClassInit();
      private native void nativeSurfaceInit(Object surface);
      private native void nativeSurfaceFinalize();
      private long native_custom_data;      // Native code will use this to keep private data
@@ -28,7 +27,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     static {
          System.loadLibrary("gstreamer_android");
          System.loadLibrary("android_publisher");
-         nativeClassInit();
     }
 
     @Override
