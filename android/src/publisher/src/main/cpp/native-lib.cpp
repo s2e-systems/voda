@@ -13,25 +13,6 @@
 #include <pthread.h>
 
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_mainactivity_MainActivity_stringFromJNI(
-    JNIEnv * env,
-    jobject /* this */) {
-
-    __android_log_print(ANDROID_LOG_INFO, "GStreamer",
-        "Called stringFromJNI of native-lib.cpp");
-    char* version_utf8 = gst_version_string();
-    jstring version_jstring = env->NewStringUTF(version_utf8);
-    g_free(version_utf8);
-    if (gst_is_initialized()) {
-        return version_jstring;
-    }
-    else {
-        return env->NewStringUTF("not initialized");
-    }
-}
-
-
 GST_DEBUG_CATEGORY_STATIC(debug_category);
 #define GST_CAT_DEFAULT debug_category
 
@@ -68,25 +49,6 @@ static JavaVM* java_vm;
  * Private methods
  */
 
- /* Register this thread with the VM */
-static JNIEnv*
-attach_current_thread(void)
-{
-    JNIEnv* env;
-    JavaVMAttachArgs args;
-
-    GST_DEBUG("Attaching thread %p", g_thread_self());
-    args.version = JNI_VERSION_1_4;
-    args.name = NULL;
-    args.group = NULL;
-
-    if (java_vm->AttachCurrentThread(&env, &args) < 0) {
-        GST_ERROR("Failed to attach current thread");
-        return NULL;
-    }
-
-    return env;
-}
 
 /* Unregister this thread from the VM */
 static void
@@ -103,7 +65,17 @@ get_jni_env(void)
     JNIEnv* env = (JNIEnv*)pthread_getspecific(current_jni_env);
 
     if (env == NULL) {
-        env = attach_current_thread();
+        JavaVMAttachArgs args;
+
+        GST_DEBUG("Attaching thread %p", g_thread_self());
+        args.version = JNI_VERSION_1_4;
+        args.name = NULL;
+        args.group = NULL;
+
+        if (java_vm->AttachCurrentThread(&env, &args) < 0) {
+            GST_ERROR("Failed to attach current thread");
+            return NULL;
+        }
         pthread_setspecific(current_jni_env, env);
     }
 
@@ -266,7 +238,6 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 static void*
 app_function(void* userdata)
 {
-    JavaVMAttachArgs args;
     GstBus* bus;
     CustomData* data = (CustomData*)userdata;
     GSource* bus_source;
@@ -388,6 +359,8 @@ app_function(void* userdata)
 extern "C" JNIEXPORT void JNICALL
 nativeInit(JNIEnv * env, jobject thiz)
 {
+    pthread_key_create(&current_jni_env, detach_current_thread);
+
     CustomData* data = g_new0(CustomData, 1);
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
@@ -517,8 +490,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     };
     int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
     if (rc != JNI_OK) return rc;
-
-    pthread_key_create(&current_jni_env, detach_current_thread);
 
     return JNI_VERSION_1_4;
 }
