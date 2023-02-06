@@ -31,6 +31,7 @@ GST_DEBUG_CATEGORY_STATIC(debug_category);
  /* Structure to contain all our information, so we can pass it to callbacks */
 typedef struct _CustomData
 {
+    JavaVM* java_vm;
     jobject app;                  /* Application instance, used to call its methods. A global reference is kept. */
     GstElement* pipeline;         /* The running pipeline */
     GMainContext* context;        /* GLib context used to run the main loop */
@@ -42,51 +43,18 @@ typedef struct _CustomData
 
 /* These global variables cache values which are not changing during execution */
 static pthread_t gst_app_thread;
-static pthread_key_t current_jni_env;
-static JavaVM* java_vm;
 
 /*
  * Private methods
  */
 
-
-/* Unregister this thread from the VM */
-static void
-detach_current_thread(void* env)
-{
-    GST_DEBUG("Detaching thread %p", g_thread_self());
-    java_vm->DetachCurrentThread();
-}
-
-/* Retrieve the JNI environment for this thread */
-static JNIEnv*
-get_jni_env(void)
-{
-    JNIEnv* env = (JNIEnv*)pthread_getspecific(current_jni_env);
-
-    if (env == NULL) {
-        JavaVMAttachArgs args;
-
-        GST_DEBUG("Attaching thread %p", g_thread_self());
-        args.version = JNI_VERSION_1_4;
-        args.name = NULL;
-        args.group = NULL;
-
-        if (java_vm->AttachCurrentThread(&env, &args) < 0) {
-            GST_ERROR("Failed to attach current thread");
-            return NULL;
-        }
-        pthread_setspecific(current_jni_env, env);
-    }
-
-    return env;
-}
-
 /* Change the content of the UI's TextView */
 static void
 set_ui_message(const gchar* message, CustomData* data)
 {
-    JNIEnv* env = get_jni_env();
+    JNIEnv* env;
+    data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
+
     GST_DEBUG("Setting message to: %s", message);
     jstring jmessage = env->NewStringUTF(message);
 
@@ -140,7 +108,6 @@ state_changed_cb(GstBus* bus, GstMessage* msg, CustomData* data)
 static void
 check_initialization_complete(CustomData* data)
 {
-    JNIEnv* env = get_jni_env();
     if (!data->initialized && data->native_window && data->main_loop) {
         GST_DEBUG
         ("Initialization complete, notifying application. native_window:%p main_loop:%p",
@@ -149,6 +116,9 @@ check_initialization_complete(CustomData* data)
         /* The main loop is running and we received a native window, inform the sink about it */
         gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
             (guintptr)data->native_window);
+
+        JNIEnv* env = NULL;
+        data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
 
         jmethodID on_gstreamer_initialized_method_id =
                 env->GetMethodID(env->GetObjectClass(data->app), "onGStreamerInitialized", "()V");
@@ -244,6 +214,13 @@ app_function(void* userdata)
     GError* error = NULL;
 
     GST_DEBUG("Creating pipeline in CustomData at %p", data);
+
+
+    JNIEnv* env;
+    if (data->java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        GST_ERROR("Failed to attach current thread");
+        return NULL;
+    }
 
     /* Create our own GLib Main Context and make it the default one */
     data->context = g_main_context_new();
@@ -348,6 +325,10 @@ app_function(void* userdata)
     gst_object_unref(data->video_sink);
     gst_object_unref(data->pipeline);
 
+    if (data->java_vm->DetachCurrentThread() != JNI_OK) {
+        GST_ERROR("Failed to detach current thread");
+        return NULL;
+    }
     return NULL;
 }
 
@@ -359,8 +340,6 @@ app_function(void* userdata)
 extern "C" JNIEXPORT void JNICALL
 nativeInit(JNIEnv * env, jobject thiz)
 {
-    pthread_key_create(&current_jni_env, detach_current_thread);
-
     CustomData* data = g_new0(CustomData, 1);
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
@@ -369,9 +348,15 @@ nativeInit(JNIEnv * env, jobject thiz)
         "Android MyGstreamerBuild");
     gst_debug_set_threshold_for_name("MyGstreamerBuild", GST_LEVEL_DEBUG);
     GST_DEBUG("Created CustomData at %p", data);
+
+    JavaVM* java_vm;
+    env->GetJavaVM(&java_vm);
+    data->java_vm = java_vm;
+
     data->app = env->NewGlobalRef(thiz);
     GST_DEBUG("Created GlobalRef for app object at %p", data->app);
     __android_log_print(ANDROID_LOG_INFO, "DDS", "spinning app_function");
+
     pthread_create(&gst_app_thread, NULL, &app_function, data);
 }
 
@@ -471,8 +456,6 @@ nativeSurfaceFinalize(JNIEnv * env, jobject thiz)
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved)
 {
-    java_vm = vm;
-
     JNIEnv* env = NULL;
     if (vm->GetEnv((void**)&env, JNI_VERSION_1_4) != JNI_OK) {
         return JNI_ERR;
