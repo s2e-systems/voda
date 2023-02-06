@@ -32,6 +32,7 @@ GST_DEBUG_CATEGORY_STATIC(debug_category);
 typedef struct _CustomData
 {
     JavaVM* java_vm;
+    pthread_t gst_app_thread;
     jobject app;                  /* Application instance, used to call its methods. A global reference is kept. */
     GstElement* pipeline;         /* The running pipeline */
     GMainContext* context;        /* GLib context used to run the main loop */
@@ -41,8 +42,6 @@ typedef struct _CustomData
     ANativeWindow* native_window; /* The Android native window where video will be rendered */
 } CustomData;
 
-/* These global variables cache values which are not changing during execution */
-static pthread_t gst_app_thread;
 
 /*
  * Private methods
@@ -357,7 +356,7 @@ nativeInit(JNIEnv * env, jobject thiz)
     GST_DEBUG("Created GlobalRef for app object at %p", data->app);
     __android_log_print(ANDROID_LOG_INFO, "DDS", "spinning app_function");
 
-    pthread_create(&gst_app_thread, NULL, &app_function, data);
+    pthread_create(&data->gst_app_thread, NULL, &app_function, data);
 }
 
 /* Quit the main loop, remove the native thread and free resources */
@@ -372,7 +371,7 @@ nativeFinalize(JNIEnv * env, jobject thiz)
     GST_DEBUG("Quitting main loop...");
     g_main_loop_quit(data->main_loop);
     GST_DEBUG("Waiting for thread to finish...");
-    pthread_join(gst_app_thread, NULL);
+    pthread_join(data->gst_app_thread, NULL);
     GST_DEBUG("Deleting GlobalRef for app object at %p", data->app);
     env->DeleteGlobalRef(data->app);
     GST_DEBUG("Freeing CustomData at %p", data);
