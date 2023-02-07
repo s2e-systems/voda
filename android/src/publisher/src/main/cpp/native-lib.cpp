@@ -35,20 +35,16 @@ typedef struct _CustomData
  * Private methods
  */
 
-/* Change the content of the UI's TextView */
 static void
-set_ui_message(const gchar* message, CustomData* data)
+set_ui_message(const gchar* message, JNIEnv* env, jobject app)
 {
-    JNIEnv* env;
-    data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
-
     GST_DEBUG("Setting message to: %s", message);
     jstring jmessage = env->NewStringUTF(message);
 
     jmethodID set_message_method_id =
-            env->GetMethodID(env->GetObjectClass(data->app), "setMessage", "(Ljava/lang/String;)V");
+            env->GetMethodID(env->GetObjectClass(app), "setMessage", "(Ljava/lang/String;)V");
 
-    env->CallVoidMethod(data->app, set_message_method_id, jmessage);
+    env->CallVoidMethod(app, set_message_method_id, jmessage);
     if (env->ExceptionCheck()) {
         GST_ERROR("Failed to call Java method");
         env->ExceptionClear();
@@ -70,7 +66,11 @@ error_cb(GstBus* bus, GstMessage* msg, CustomData* data)
             GST_OBJECT_NAME(msg->src), err->message);
     g_clear_error(&err);
     g_free(debug_info);
-    set_ui_message(message_string, data);
+
+    JNIEnv* env = NULL;
+    data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
+
+    set_ui_message(message_string, env, data->app);
     g_free(message_string);
     gst_element_set_state(data->pipeline, GST_STATE_NULL);
 }
@@ -81,11 +81,15 @@ state_changed_cb(GstBus* bus, GstMessage* msg, CustomData* data)
 {
     GstState old_state, new_state, pending_state;
     gst_message_parse_state_changed(msg, &old_state, &new_state, &pending_state);
+
+    JNIEnv* env = NULL;
+    data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
+
     /* Only pay attention to messages coming from the pipeline, not its children */
     if (GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline)) {
         gchar* message = g_strdup_printf("State changed to %s",
             gst_element_state_get_name(new_state));
-        set_ui_message(message, data);
+        set_ui_message(message, env, data->app);
         g_free(message);
     }
 }
@@ -221,7 +225,7 @@ app_function(void* userdata)
         gchar* message =
             g_strdup_printf("Unable to build pipeline: %s", error->message);
         g_clear_error(&error);
-        set_ui_message(message, data);
+        set_ui_message(message, env, data->app);
         g_free(message);
         return NULL;
     }
