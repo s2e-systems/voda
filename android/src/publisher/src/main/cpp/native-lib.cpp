@@ -16,19 +16,7 @@
 GST_DEBUG_CATEGORY_STATIC(debug_category);
 #define GST_CAT_DEFAULT debug_category
 
-/*
- * These macros provide a way to store the native pointer to CustomData, which might be 32 or 64 bits, into
- * a jlong, which is always 64 bits, without warnings.
- */
-#if GLIB_SIZEOF_VOID_P == 8
-# define GET_CUSTOM_DATA(env, thiz, fieldID) (CustomData *)env->GetLongField(thiz, fieldID)
-# define SET_CUSTOM_DATA(env, thiz, fieldID, data) env->SetLongField(thiz, fieldID, (jlong)data)
-#else
-# define GET_CUSTOM_DATA(env, thiz, fieldID) (CustomData *)(jint)env->GetLongField(thiz, fieldID)
-# define SET_CUSTOM_DATA(env, thiz, fieldID, data) env->SetLongField(thiz, fieldID, (jlong)(jint)data)
-#endif
 
- /* Structure to contain all our information, so we can pass it to callbacks */
 typedef struct _CustomData
 {
     JavaVM* java_vm;
@@ -342,7 +330,7 @@ nativeInit(JNIEnv * env, jobject thiz)
     CustomData* data = g_new0(CustomData, 1);
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    SET_CUSTOM_DATA(env, thiz, custom_data_field_id, data);
+    env->SetLongField(thiz, custom_data_field_id, (jlong)data);
     GST_DEBUG_CATEGORY_INIT(debug_category, "MyGstreamerBuild", 0,
         "Android MyGstreamerBuild");
     gst_debug_set_threshold_for_name("MyGstreamerBuild", GST_LEVEL_DEBUG);
@@ -365,7 +353,7 @@ nativeFinalize(JNIEnv * env, jobject thiz)
 {
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
+    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
     if (!data)
         return;
     GST_DEBUG("Quitting main loop...");
@@ -376,8 +364,7 @@ nativeFinalize(JNIEnv * env, jobject thiz)
     env->DeleteGlobalRef(data->app);
     GST_DEBUG("Freeing CustomData at %p", data);
     g_free(data);
-    SET_CUSTOM_DATA(env, thiz, custom_data_field_id, NULL);
-
+    env->SetLongField(thiz, custom_data_field_id, NULL);
     delete data_writer;
     delete domain_participant;
 
@@ -402,7 +389,7 @@ nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
 {
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
+    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
     if (!data)
         return;
     ANativeWindow* new_native_window = ANativeWindow_fromSurface(env, surface);
@@ -436,7 +423,7 @@ nativeSurfaceFinalize(JNIEnv * env, jobject thiz)
 {
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    CustomData* data = GET_CUSTOM_DATA(env, thiz, custom_data_field_id);
+    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
     if (!data)
         return;
     GST_DEBUG("Releasing Native Window %p", data->native_window);
