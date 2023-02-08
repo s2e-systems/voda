@@ -21,13 +21,12 @@ typedef struct _CustomData
 {
     JavaVM* java_vm;
     pthread_t gst_app_thread;
-    jobject app;                  /* Application instance, used to call its methods. A global reference is kept. */
-    GstElement* pipeline;         /* The running pipeline */
-    GMainContext* context;        /* GLib context used to run the main loop */
-    GMainLoop* main_loop;         /* GLib main loop */
-    gboolean initialized;         /* To avoid informing the UI multiple times about the initialization */
-    GstElement* video_sink;       /* The video sink element which receives XOverlay commands */
-    ANativeWindow* native_window; /* The Android native window where video will be rendered */
+    jobject app;
+    GstElement* pipeline;
+    GMainLoop* main_loop;
+    gboolean initialized;
+    GstElement* video_sink;
+    ANativeWindow* native_window;
 } CustomData;
 
 
@@ -52,9 +51,13 @@ set_ui_message(const gchar* message, JNIEnv* env, jobject app)
     env->DeleteLocalRef(jmessage);
 }
 
-/* Retrieve errors from the bus and show them on the UI */
+struct ErrorCbData {
+    JNIEnv* jni_env;
+    jobject object;
+};
+
 static void
-error_cb(GstBus* bus, GstMessage* msg, CustomData* data)
+error_cb(GstBus* bus, GstMessage* msg, ErrorCbData* data)
 {
     GError* err;
     gchar* debug_info;
@@ -67,12 +70,8 @@ error_cb(GstBus* bus, GstMessage* msg, CustomData* data)
     g_clear_error(&err);
     g_free(debug_info);
 
-    JNIEnv* env = NULL;
-    data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
-
-    set_ui_message(message_string, env, data->app);
+    set_ui_message(message_string, data->jni_env, data->object);
     g_free(message_string);
-    gst_element_set_state(data->pipeline, GST_STATE_NULL);
 }
 
 /* Notify UI about pipeline state changes */
@@ -214,8 +213,8 @@ app_function(void* userdata)
     }
 
     /* Create our own GLib Main Context and make it the default one */
-    data->context = g_main_context_new();
-    g_main_context_push_thread_default(data->context);
+    GMainContext* context = g_main_context_new();
+    g_main_context_push_thread_default(context);
 
     /* Build pipeline */
     data->pipeline =
@@ -292,17 +291,17 @@ app_function(void* userdata)
     bus_source = gst_bus_create_watch(bus);
     g_source_set_callback(bus_source, (GSourceFunc)gst_bus_async_signal_func,
         NULL, NULL);
-    g_source_attach(bus_source, data->context);
+    g_source_attach(bus_source, context);
     g_source_unref(bus_source);
-    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb,
-        data);
-    g_signal_connect(G_OBJECT(bus), "message::state-changed",
-        (GCallback)state_changed_cb, data);
+
+    ErrorCbData e{.jni_env = env, .object = data->app};
+    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, &e);
+    g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback)state_changed_cb, data);
     gst_object_unref(bus);
 
     /* Create a GLib Main Loop and set it to run */
     GST_DEBUG("Entering main loop... (CustomData:%p)", data);
-    data->main_loop = g_main_loop_new(data->context, FALSE);
+    data->main_loop = g_main_loop_new(context, FALSE);
     check_initialization_complete(data);
     g_main_loop_run(data->main_loop);
     GST_DEBUG("Exited main loop");
@@ -310,8 +309,8 @@ app_function(void* userdata)
     data->main_loop = NULL;
 
     /* Free resources */
-    g_main_context_pop_thread_default(data->context);
-    g_main_context_unref(data->context);
+    g_main_context_pop_thread_default(context);
+    g_main_context_unref(context);
     gst_element_set_state(data->pipeline, GST_STATE_NULL);
     gst_object_unref(data->video_sink);
     gst_object_unref(data->pipeline);
@@ -368,7 +367,7 @@ nativeFinalize(JNIEnv * env, jobject thiz)
     env->DeleteGlobalRef(data->app);
     GST_DEBUG("Freeing CustomData at %p", data);
     g_free(data);
-    env->SetLongField(thiz, custom_data_field_id, NULL);
+    env->SetLongField(thiz, custom_data_field_id, 0);
     delete data_writer;
     delete domain_participant;
 
