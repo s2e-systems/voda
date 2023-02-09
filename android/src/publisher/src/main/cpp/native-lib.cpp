@@ -34,21 +34,22 @@ typedef struct _CustomData
  * Private methods
  */
 
-static void
-set_ui_message(const gchar* message, JNIEnv* env, jobject app)
-{
-    GST_DEBUG("Setting message to: %s", message);
-    jstring jmessage = env->NewStringUTF(message);
+static JNIEnv* get_jni_env_from_java_vm(JavaVM* java_vm) {
+    JNIEnv* jni_env = nullptr;
+    java_vm->GetEnv(reinterpret_cast<void**>(&jni_env), JNI_VERSION_1_4);
+    return jni_env;
+}
 
-    jmethodID set_message_method_id =
-            env->GetMethodID(env->GetObjectClass(app), "setMessage", "(Ljava/lang/String;)V");
-
-    env->CallVoidMethod(app, set_message_method_id, jmessage);
-    if (env->ExceptionCheck()) {
-        GST_ERROR("Failed to call Java method");
-        env->ExceptionClear();
+static void set_ui_message(const gchar *message, JNIEnv *jni_env, jobject app) {
+    const jstring jmessage = jni_env->NewStringUTF(message);
+    const jmethodID set_message_method_id = jni_env->GetMethodID(jni_env->GetObjectClass(app),
+                                                           "setMessage", "(Ljava/lang/String;)V");
+    jni_env->CallVoidMethod(app, set_message_method_id, jmessage);
+    if (jni_env->ExceptionCheck()) {
+        __android_log_print(ANDROID_LOG_ERROR, "GStreamer", "Failed to call Java method");
+        jni_env->ExceptionClear();
     }
-    env->DeleteLocalRef(jmessage);
+    jni_env->DeleteLocalRef(jmessage);
 }
 
 struct ErrorCbData {
@@ -56,67 +57,44 @@ struct ErrorCbData {
     jobject object;
 };
 
-static void
-error_cb(GstBus* bus, GstMessage* msg, ErrorCbData* data)
-{
-    GError* err;
-    gchar* debug_info;
-    gchar* message_string;
-
-    gst_message_parse_error(msg, &err, &debug_info);
-    message_string =
-        g_strdup_printf("Error received from element %s: %s",
-            GST_OBJECT_NAME(msg->src), err->message);
-    g_clear_error(&err);
+static void error_cb(GstBus *bus, GstMessage *message, ErrorCbData *data) {
+    GError *error;
+    gchar *debug_info;
+    gst_message_parse_error(message, &error, &debug_info);
+    gchar *const message_string = g_strdup_printf("Error received from element %s: %s",
+                                                  GST_OBJECT_NAME(message->src), error->message);
+    g_clear_error(&error);
     g_free(debug_info);
-
     set_ui_message(message_string, data->jni_env, data->object);
     g_free(message_string);
 }
 
-/* Notify UI about pipeline state changes */
-static void
-state_changed_cb(GstBus* bus, GstMessage* msg, CustomData* data)
-{
-    GstState old_state, new_state, pending_state;
-    gst_message_parse_state_changed(msg, &old_state, &new_state, &pending_state);
-
-    JNIEnv* env = NULL;
-    data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
-
-    /* Only pay attention to messages coming from the pipeline, not its children */
-    if (GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline)) {
-        gchar* message = g_strdup_printf("State changed to %s",
-            gst_element_state_get_name(new_state));
-        set_ui_message(message, env, data->app);
+static void state_changed_cb(GstBus *bus, GstMessage *message, CustomData *data) {
+    GstState old_state;
+    GstState new_state;
+    GstState pending_state;
+    gst_message_parse_state_changed(message, &old_state, &new_state, &pending_state);
+    // Only show messages coming from the pipeline, not its children
+    if (GST_MESSAGE_SRC(message) == GST_OBJECT(data->pipeline)) {
+        JNIEnv *const jni_env = get_jni_env_from_java_vm(data->java_vm);
+        gchar *const message = g_strdup_printf("State changed to %s",
+                                               gst_element_state_get_name(new_state));
+        set_ui_message(message, jni_env, data->app);
         g_free(message);
     }
 }
 
-/* Check if all conditions are met to report GStreamer as initialized.
- * These conditions will change depending on the application */
-static void
-check_initialization_complete(CustomData* data)
-{
+static void check_initialization_complete(CustomData *data) {
     if (!data->initialized && data->native_window && data->main_loop) {
-        GST_DEBUG
-        ("Initialization complete, notifying application. native_window:%p main_loop:%p",
-            data->native_window, data->main_loop);
-
-        /* The main loop is running and we received a native window, inform the sink about it */
         gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
-            (guintptr)data->native_window);
-
-        JNIEnv* env = NULL;
-        data->java_vm->GetEnv((void**)&env, JNI_VERSION_1_4);
-
-        jmethodID on_gstreamer_initialized_method_id =
-                env->GetMethodID(env->GetObjectClass(data->app), "onGStreamerInitialized", "()V");
-
-        env->CallVoidMethod(data->app, on_gstreamer_initialized_method_id);
-        if (env->ExceptionCheck()) {
-            GST_ERROR("Failed to call Java method");
-            env->ExceptionClear();
+                                            reinterpret_cast<guintptr>(data->native_window));
+        JNIEnv *const jni_env = get_jni_env_from_java_vm(data->java_vm);
+        const jmethodID on_gstreamer_initialized_method_id = jni_env->GetMethodID(
+                jni_env->GetObjectClass(data->app), "onGStreamerInitialized", "()V");
+        jni_env->CallVoidMethod(data->app, on_gstreamer_initialized_method_id);
+        if (jni_env->ExceptionCheck()) {
+            __android_log_print(ANDROID_LOG_ERROR, "GStreamer", "Failed to call Java method");
+            jni_env->ExceptionClear();
         }
         data->initialized = TRUE;
     }
