@@ -41,7 +41,7 @@ static JNIEnv* get_jni_env_from_java_vm(JavaVM* java_vm) {
 }
 
 static void set_ui_message(const gchar *message, JNIEnv *jni_env, jobject app) {
-    const jstring jmessage = jni_env->NewStringUTF(message);
+    jstring jmessage = jni_env->NewStringUTF(message);
     const jmethodID set_message_method_id = jni_env->GetMethodID(jni_env->GetObjectClass(app),
                                                            "setMessage", "(Ljava/lang/String;)V");
     jni_env->CallVoidMethod(app, set_message_method_id, jmessage);
@@ -83,24 +83,6 @@ static void state_changed_cb(GstBus *bus, GstMessage *message, CustomData *data)
         g_free(message);
     }
 }
-
-static void check_initialization_complete(CustomData *data) {
-    if (!data->initialized && data->native_window && data->main_loop) {
-        gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
-                                            reinterpret_cast<guintptr>(data->native_window));
-        JNIEnv *const jni_env = get_jni_env_from_java_vm(data->java_vm);
-        const jmethodID on_gstreamer_initialized_method_id = jni_env->GetMethodID(
-                jni_env->GetObjectClass(data->app), "onGStreamerInitialized", "()V");
-        jni_env->CallVoidMethod(data->app, on_gstreamer_initialized_method_id);
-        if (jni_env->ExceptionCheck()) {
-            __android_log_print(ANDROID_LOG_ERROR, "GStreamer", "Failed to call Java method");
-            jni_env->ExceptionClear();
-        }
-        data->initialized = TRUE;
-    }
-}
-
-
 
 
 /////////////////////
@@ -280,7 +262,14 @@ app_function(void* userdata)
     /* Create a GLib Main Loop and set it to run */
     GST_DEBUG("Entering main loop... (CustomData:%p)", data);
     data->main_loop = g_main_loop_new(context, FALSE);
-    check_initialization_complete(data);
+
+    if (data->native_window) {
+        gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
+                                        reinterpret_cast<guintptr>(data->native_window));
+    }
+
+    gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
+
     g_main_loop_run(data->main_loop);
     GST_DEBUG("Exited main loop");
     g_main_loop_unref(data->main_loop);
@@ -352,18 +341,6 @@ nativeFinalize(JNIEnv * env, jobject thiz)
     GST_DEBUG("Done finalizing");
 }
 
-/* Set pipeline to PLAYING state */
-extern "C" JNIEXPORT void JNICALL
-nativePlay(JNIEnv * env, jobject thiz)
-{
-    jfieldID custom_data_field_id =
-            env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
-    if (!data)
-        return;
-    GST_DEBUG("Setting state to PLAYING");
-    gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
-}
 
 extern "C" JNIEXPORT void JNICALL
 nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
@@ -395,7 +372,10 @@ nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
     }
     data->native_window = new_native_window;
 
-    check_initialization_complete(data);
+    gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
+                                        reinterpret_cast<guintptr>(data->native_window));
+
+    gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
 }
 
 
@@ -434,7 +414,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     static const JNINativeMethod methods[] = {
     {"nativeInit", "()V", reinterpret_cast<void*>(nativeInit)},
     {"nativeFinalize", "()V", reinterpret_cast<void*>(nativeFinalize)},
-    {"nativePlay", "()V", reinterpret_cast<void*>(nativePlay)},
     {"nativeSurfaceInit", "(Ljava/lang/Object;)V", reinterpret_cast<void*>(nativeSurfaceInit)},
     {"nativeSurfaceFinalize", "()V", reinterpret_cast<void*>(nativeSurfaceFinalize)},
     };

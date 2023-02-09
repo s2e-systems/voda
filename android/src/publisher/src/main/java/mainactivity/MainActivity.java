@@ -17,7 +17,6 @@ import org.freedesktop.gstreamer.GStreamer;
 public class MainActivity extends Activity implements SurfaceHolder.Callback {
      private native void nativeInit();
      private native void nativeFinalize();
-     private native void nativePlay();
      private native void nativeSurfaceInit(Object surface);
      private native void nativeSurfaceFinalize();
      private long native_custom_data;      // Native code will use this to keep private data
@@ -37,19 +36,16 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        binding.textviewMessage.setText("starting ... ");
+        binding.textviewMessage.setText("Starting ... ");
 
          try {
              GStreamer.init(this);
-             SurfaceView sv = binding.surfaceVideo;
-             SurfaceHolder sh = sv.getHolder();
-             sh.addCallback(this);
-
-             nativeInit();
-
          } catch (Exception e) {
-             binding.textviewMessage.setText("Failed intializing gstreamer:" + e.getMessage());
+             binding.textviewMessage.setText("Failed to intialize GStreamer:" + e.getMessage());
          }
+         binding.surfaceVideo.getHolder().addCallback(this);
+
+         nativeInit();
      }
 
      protected void onDestroy() {
@@ -67,18 +63,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
          });
      }
 
-     // Called from native code. Native code calls this once it has created its pipeline and
-     // the main loop is running, so it is ready to accept commands.
-     private void onGStreamerInitialized () {
-         final TextView tv = binding.textviewMessage;
-         tv.setText("GStreamer initialized");
-         Log.i ("GStreamer", "Gst initialized. Start playing");
-
-         nativePlay();
-    }
-
-
-
     public void surfaceChanged(SurfaceHolder holder, int format, int width,
                                int height) {
          Log.d("GStreamer", "Surface changed to format " + format + " width "
@@ -92,7 +76,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
     public void surfaceDestroyed(SurfaceHolder holder) {
          Log.d("GStreamer", "Surface destroyed");
-         nativeSurfaceFinalize ();
+         nativeSurfaceFinalize();
     }
 
 }
