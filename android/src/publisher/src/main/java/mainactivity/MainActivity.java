@@ -15,7 +15,7 @@ import org.freedesktop.gstreamer.GStreamer;
 
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback {
-     private native void nativeInit();
+     private native void nativeLibInit();
      private native void nativeFinalize();
      private native void nativeSurfaceInit(Object surface);
      private native void nativeSurfaceFinalize();
@@ -45,7 +45,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
          }
          binding.surfaceVideo.getHolder().addCallback(this);
 
-         nativeInit();
+        nativeLibInit();
      }
 
      protected void onDestroy() {
