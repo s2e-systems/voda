@@ -56,7 +56,7 @@ struct ErrorCbData {
     jobject object;
 };
 
-static void error_cb(GstBus *bus, GstMessage *message, ErrorCbData *data) {
+static void error_cb(GstBus *bus, GstMessage *message, CustomData *data) {
     GError *error;
     gchar *debug_info;
     gst_message_parse_error(message, &error, &debug_info);
@@ -64,7 +64,7 @@ static void error_cb(GstBus *bus, GstMessage *message, ErrorCbData *data) {
                                                   GST_OBJECT_NAME(message->src), error->message);
     g_clear_error(&error);
     g_free(debug_info);
-    set_ui_message(message_string, data->jni_env, data->object);
+    set_ui_message(message_string, get_jni_env_from_java_vm(data->java_vm), data->app);
     g_free(message_string);
 }
 
@@ -78,6 +78,7 @@ static void state_changed_cb(GstBus *bus, GstMessage *message, CustomData *data)
         JNIEnv *const jni_env = get_jni_env_from_java_vm(data->java_vm);
         gchar *const message = g_strdup_printf("State changed to %s",
                                                gst_element_state_get_name(new_state));
+        __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "%s", message);
         set_ui_message(message, jni_env, data->app);
         g_free(message);
     }
@@ -158,113 +159,41 @@ static void*
 app_function(void* userdata)
 {
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "app_function");
-    GstBus* bus;
+
     CustomData* data = (CustomData*)userdata;
-    GSource* bus_source;
-    GError* error = NULL;
 
     JNIEnv* env;
     if (data->java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
         GST_ERROR("Failed to attach current thread");
         return NULL;
     }
-
-    /* Create our own GLib Main Context and make it the default one */
     GMainContext* context = g_main_context_new();
     g_main_context_push_thread_default(context);
 
-    /* Build pipeline */
-    data->pipeline =
-        gst_parse_launch("ahcsrc ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
-            &error);
-    if (error) {
-        gchar* message =
-            g_strdup_printf("Unable to build pipeline: %s", error->message);
-        g_clear_error(&error);
-        set_ui_message(message, env, data->app);
-        g_free(message);
-        return NULL;
-    }
 
-    GstElement* app_sink = gst_bin_get_by_name(GST_BIN(data->pipeline), "app_sink");
-    if (!app_sink) {
-        GST_ERROR("Could not retrieve app_sink");
-        return NULL;
-    }
-    else {
-        GST_DEBUG("app_sink found");
-    }
+    GstBus* bus = gst_element_get_bus(data->pipeline);
+    GSource* bus_source = gst_bus_create_watch(bus);
 
-    g_object_set(app_sink,
-        "emit-signals", true,
-        //                 "caps", ddsSinkCaps,
-        "max-buffers", 1,
-        "drop", false,
-        "sync", false,
-        nullptr
-    );
-
-    setenv("CYCLONEDDS_URI", R"(<CycloneDDS><Domain><General><Interfaces>
-        <NetworkInterface name="eth1" presence_required="false" />
-        <NetworkInterface name="wlan0" presence_required="false" />
-        </Interfaces></General></Domain></CycloneDDS>)", 1);
-
-    try {
-        const std::string topicName = "VideoStream";
-
-        domain_participant = new DomainParticipant;
-        const dds::topic::qos::TopicQos topicQos{ domain_participant->dp.default_topic_qos() };
-        const dds::topic::Topic<S2E::Video> topic{ domain_participant->dp, topicName, topicQos };
-        const dds::pub::qos::PublisherQos publisherQos{ domain_participant->dp.default_publisher_qos() };
-        const dds::pub::Publisher publisher{ domain_participant->dp, publisherQos };
-        dds::pub::qos::DataWriterQos dataWriterQos{ topic.qos() };
-        dataWriterQos << dds::core::policy::WriterDataLifecycle::AutoDisposeUnregisteredInstances();
-        dataWriterQos << dds::core::policy::Ownership::Exclusive();
-        dataWriterQos << dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(5000));
-        dataWriterQos << dds::core::policy::OwnershipStrength(1000);
-        data_writer = new DataWriter<S2E::Video>{ publisher, topic, dataWriterQos };
-    }
-    catch (const dds::core::Exception& e) {
-        __android_log_print(ANDROID_LOG_ERROR, "DDS", "DDS initializaion failed with: %s", e.what());
-        return NULL;
-    }
-
-    g_signal_connect(app_sink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
-        reinterpret_cast<gpointer>(data_writer));
-
-    /* Set the pipeline to READY, so it can already accept a window handle, if we have one */
-    gst_element_set_state(data->pipeline, GST_STATE_READY);
-
-    data->video_sink =
-        gst_bin_get_by_interface(GST_BIN(data->pipeline),
-            GST_TYPE_VIDEO_OVERLAY);
-    if (!data->video_sink) {
-        GST_ERROR("Could not retrieve video sink");
-        return NULL;
-    }
-
-    /* Instruct the bus to emit signals for each received message, and connect to the interesting signals */
-    bus = gst_element_get_bus(data->pipeline);
-    bus_source = gst_bus_create_watch(bus);
+    // Instruct the bus to emit signals for each received message
     g_source_set_callback(bus_source, (GSourceFunc)gst_bus_async_signal_func,
-        NULL, NULL);
+                          NULL, NULL);
     g_source_attach(bus_source, context);
     g_source_unref(bus_source);
 
-    ErrorCbData e{.jni_env = env, .object = data->app};
-    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, &e);
+    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, data);
     g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback)state_changed_cb, data);
     gst_object_unref(bus);
 
-    /* Create a GLib Main Loop and set it to run */
-    GST_DEBUG("Entering main loop... (CustomData:%p)", data);
+    set_ui_message("Entering main loop", env, data->app);
+    __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Entering main loop");
     data->main_loop = g_main_loop_new(context, FALSE);
 
     if (data->native_window) {
+        __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "gst_video_overlay_set_window_handle in app_function");
         gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
                                         reinterpret_cast<guintptr>(data->native_window));
     }
-
+    __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "gst_element_set_state GST_STATE_PLAYING in app_function");
     gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
 
     g_main_loop_run(data->main_loop);
@@ -295,6 +224,7 @@ extern "C" JNIEXPORT void JNICALL
 nativeLibInit(JNIEnv * env, jobject thiz)
 {
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "nativeLibInit");
+
     CustomData* data = g_new0(CustomData, 1);
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
@@ -310,6 +240,76 @@ nativeLibInit(JNIEnv * env, jobject thiz)
 
     data->app = env->NewGlobalRef(thiz);
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Created GlobalRef for app object at %p for %p", data->app, thiz);
+
+    GError* error = NULL;
+    data->pipeline =
+            gst_parse_launch("ahcsrc ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
+                             &error);
+    if (error) {
+        gchar* message =
+                g_strdup_printf("Unable to build pipeline: %s", error->message);
+        g_clear_error(&error);
+        set_ui_message(message, env, data->app);
+        g_free(message);
+        return;
+    }
+
+    GstElement* app_sink = gst_bin_get_by_name(GST_BIN(data->pipeline), "app_sink");
+    if (!app_sink) {
+        GST_ERROR("Could not retrieve app_sink");
+        return;
+    }
+    else {
+        GST_DEBUG("app_sink found");
+    }
+
+    g_object_set(app_sink,
+                 "emit-signals", true,
+            //                 "caps", ddsSinkCaps,
+                 "max-buffers", 1,
+                 "drop", false,
+                 "sync", false,
+                 nullptr
+    );
+
+    setenv("CYCLONEDDS_URI", R"(<CycloneDDS><Domain><General><Interfaces>
+        <NetworkInterface name="eth1" presence_required="false" />
+        <NetworkInterface name="wlan0" presence_required="false" />
+        </Interfaces></General></Domain></CycloneDDS>)", 1);
+
+    try {
+        const std::string topicName = "VideoStream";
+
+        domain_participant = new DomainParticipant;
+        const dds::topic::qos::TopicQos topicQos{ domain_participant->dp.default_topic_qos() };
+        const dds::topic::Topic<S2E::Video> topic{ domain_participant->dp, topicName, topicQos };
+        const dds::pub::qos::PublisherQos publisherQos{ domain_participant->dp.default_publisher_qos() };
+        const dds::pub::Publisher publisher{ domain_participant->dp, publisherQos };
+        dds::pub::qos::DataWriterQos dataWriterQos{ topic.qos() };
+        dataWriterQos << dds::core::policy::WriterDataLifecycle::AutoDisposeUnregisteredInstances();
+        dataWriterQos << dds::core::policy::Ownership::Exclusive();
+        dataWriterQos << dds::core::policy::Liveliness::ManualByTopic(dds::core::Duration::from_millisecs(5000));
+        dataWriterQos << dds::core::policy::OwnershipStrength(1000);
+        data_writer = new DataWriter<S2E::Video>{ publisher, topic, dataWriterQos };
+    }
+    catch (const dds::core::Exception& e) {
+        __android_log_print(ANDROID_LOG_ERROR, "DDS", "DDS initializaion failed with: %s", e.what());
+        return;
+    }
+
+    g_signal_connect(app_sink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
+                     reinterpret_cast<gpointer>(data_writer));
+
+    /* Set the pipeline to READY, so it can already accept a window handle, if we have one */
+    gst_element_set_state(data->pipeline, GST_STATE_READY);
+
+    data->video_sink =
+            gst_bin_get_by_interface(GST_BIN(data->pipeline),
+                                     GST_TYPE_VIDEO_OVERLAY);
+    if (!data->video_sink) {
+        GST_ERROR("Could not retrieve video sink");
+        return;
+    }
 
     pthread_create(&data->gst_app_thread, NULL, &app_function, data);
 }
@@ -367,10 +367,13 @@ nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
     data->native_window = new_native_window;
 
     if (data->video_sink) {
+        __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "gst_video_overlay_set_window_handle in nativeSurfaceInit");
         gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
                                             reinterpret_cast<guintptr>(data->native_window));
     }
-    gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
+    __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "gst_element_set_state GST_STATE_PLAYING");
+
+    //gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
 }
 
 
