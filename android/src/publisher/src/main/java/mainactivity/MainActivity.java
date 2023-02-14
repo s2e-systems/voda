@@ -1,6 +1,7 @@
 package mainactivity;
 
 import android.os.Bundle;
+import android.os.Handler;
 import android.widget.TextView;
 
 import mainactivity.databinding.ActivityMainBinding;
@@ -15,6 +16,7 @@ import org.freedesktop.gstreamer.GStreamer;
 
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback {
+     private native void nativeCustomDataInit();
      private native void nativeLibInit();
      private native void nativeFinalize();
      private native void nativeSurfaceInit(Object surface);
@@ -33,49 +35,49 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     {
         super.onCreate(savedInstanceState);
 
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        nativeCustomDataInit();
 
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        binding.surfaceVideo.getHolder().addCallback(this);
+        setContentView(binding.getRoot());
         binding.textviewMessage.setText("Starting ... ");
 
-         try {
-             GStreamer.init(this);
-         } catch (Exception e) {
-             binding.textviewMessage.setText("Failed to intialize GStreamer:" + e.getMessage());
-         }
-         binding.surfaceVideo.getHolder().addCallback(this);
-
+        try {
+            GStreamer.init(this);
+        } catch (Exception e) {
+            binding.textviewMessage.setText("Failed to intialize GStreamer:" + e.getMessage());
+        }
         nativeLibInit();
-     }
+    }
 
-     protected void onDestroy() {
-         nativeFinalize();
-         super.onDestroy();
-     }
+    protected void onDestroy() {
+        nativeFinalize();
+        super.onDestroy();
+    }
 
-     // Called from native code. This sets the content of the TextView from the UI thread.
-     private void setMessage(final String message) {
-         final TextView tv = binding.textviewMessage;
-         runOnUiThread (new Runnable() {
-             public void run() {
-                 tv.setText(message);
-             }
-         });
-     }
+    // Called from native code. This sets the content of the TextView from the UI thread.
+    private void setMessage(final String message) {
+        final TextView tv = binding.textviewMessage;
+        runOnUiThread (new Runnable() {
+         public void run() {
+             tv.setText(message);
+         }
+        });
+    }
 
     public void surfaceChanged(SurfaceHolder holder, int format, int width,
                                int height) {
-         Log.d("GStreamer", "Surface changed to format " + format + " width "
+         Log.d("MainGStreamer", "Surface changed to format " + format + " width "
                  + width + " height " + height);
          nativeSurfaceInit (holder.getSurface());
     }
 
     public void surfaceCreated(SurfaceHolder holder) {
-         Log.d("GStreamer", "Surface created: " + holder.getSurface());
+         Log.d("MainGStreamer", "Surface created: " + holder.getSurface());
     }
 
     public void surfaceDestroyed(SurfaceHolder holder) {
-         Log.d("GStreamer", "Surface destroyed");
+         Log.d("MainGStreamer", "Surface destroyed");
          nativeSurfaceFinalize();
     }
 

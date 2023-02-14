@@ -219,16 +219,23 @@ app_function(void* userdata)
  * Java Bindings
  */
 
+extern "C" JNIEXPORT void JNICALL
+nativeCustomDataInit(JNIEnv * env, jobject thiz) {
+    CustomData* data = g_new0(CustomData, 1);
+    jfieldID custom_data_field_id =
+            env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
+    env->SetLongField(thiz, custom_data_field_id, (jlong)data);
+}
+
  /* Instruct the native code to create its internal data structure, pipeline and thread */
 extern "C" JNIEXPORT void JNICALL
 nativeLibInit(JNIEnv * env, jobject thiz)
 {
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "nativeLibInit");
-
-    CustomData* data = g_new0(CustomData, 1);
     jfieldID custom_data_field_id =
             env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    env->SetLongField(thiz, custom_data_field_id, (jlong)data);
+    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
+
     GST_DEBUG_CATEGORY_INIT(debug_category, "MyGstreamerBuild", 0,
         "Android MyGstreamerBuild");
     gst_debug_set_threshold_for_name("MyGstreamerBuild", GST_LEVEL_DEBUG);
@@ -243,7 +250,7 @@ nativeLibInit(JNIEnv * env, jobject thiz)
 
     GError* error = NULL;
     data->pipeline =
-            gst_parse_launch("ahcsrc ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
+            gst_parse_launch("ahcsrc device=1 ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
                              &error);
     if (error) {
         gchar* message =
@@ -311,6 +318,12 @@ nativeLibInit(JNIEnv * env, jobject thiz)
         return;
     }
 
+    if (data->native_window) {
+        __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "gst_video_overlay_set_window_handle in nativeLibInit");
+        gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(data->video_sink),
+                                            reinterpret_cast<guintptr>(data->native_window));
+    }
+
     pthread_create(&data->gst_app_thread, NULL, &app_function, data);
 }
 
@@ -349,21 +362,19 @@ nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
     if (!data)
         return;
     ANativeWindow* new_native_window = ANativeWindow_fromSurface(env, surface);
-    GST_DEBUG("Received surface %p (native window %p)", surface,
-        new_native_window);
+    __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Received surface %p (native window %p)", surface, new_native_window);
 
-    if (data->native_window) {
-        ANativeWindow_release(data->native_window);
-        if (data->native_window == new_native_window) {
-            GST_DEBUG("New native window is the same as the previous one %p",
-                data->native_window);
-            if (data->video_sink) {
-                gst_video_overlay_expose(GST_VIDEO_OVERLAY(data->video_sink));
-                gst_video_overlay_expose(GST_VIDEO_OVERLAY(data->video_sink));
-            }
-            return;
-        }
-    }
+//    if (data->native_window) {
+//        ANativeWindow_release(data->native_window);
+//        if (data->native_window == new_native_window) {
+//            __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "New native window is the same as the previous one %p", data->native_window);
+//            if (data->video_sink) {
+//                gst_video_overlay_expose(GST_VIDEO_OVERLAY(data->video_sink));
+//                gst_video_overlay_expose(GST_VIDEO_OVERLAY(data->video_sink));
+//            }
+//            return;
+//        }
+//    }
     data->native_window = new_native_window;
 
     if (data->video_sink) {
@@ -373,7 +384,7 @@ nativeSurfaceInit(JNIEnv * env, jobject thiz, jobject surface)
     }
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "gst_element_set_state GST_STATE_PLAYING");
 
-    //gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
+    gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
 }
 
 
@@ -408,6 +419,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     if (c == nullptr) return JNI_ERR;
 
     static const JNINativeMethod methods[] = {
+    {"nativeCustomDataInit", "()V", reinterpret_cast<void*>(nativeCustomDataInit)},
     {"nativeLibInit", "()V", reinterpret_cast<void*>(nativeLibInit)},
     {"nativeFinalize", "()V", reinterpret_cast<void*>(nativeFinalize)},
     {"nativeSurfaceInit", "(Ljava/lang/Object;)V", reinterpret_cast<void*>(nativeSurfaceInit)},
