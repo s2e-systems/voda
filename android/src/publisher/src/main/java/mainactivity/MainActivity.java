@@ -14,14 +14,39 @@ import android.view.SurfaceView;
 
 import org.freedesktop.gstreamer.GStreamer;
 
+class SurfaceHolderCallback implements SurfaceHolder.Callback {
+    private native void nativeSurfaceInit(Object surface, long video_sink);
+    private native void nativeSurfaceFinalize(Object surface);
 
-public class MainActivity extends Activity implements SurfaceHolder.Callback {
-     private native void nativeCustomDataInit();
-     private native void nativeLibInit();
-     private native void nativeFinalize();
-     private native void nativeSurfaceInit(Object surface);
-     private native void nativeSurfaceFinalize();
-     private long native_custom_data;      // Native code will use this to keep private data
+    SurfaceHolderCallback(long video_sink) {
+        this.video_sink = video_sink;
+    }
+    long video_sink;
+
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        Log.d("MainGStreamer", "Surface changed to format " + format + " width "
+                + width + " height " + height);
+        nativeSurfaceInit(holder.getSurface(), this.video_sink);
+    }
+
+    public void surfaceCreated(SurfaceHolder holder) {
+        Log.d("MainGStreamer", "Surface created: " + holder.getSurface());
+    }
+
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.d("MainGStreamer", "Surface destroyed");
+        nativeSurfaceFinalize(holder.getSurface());
+    }
+}
+
+public class MainActivity extends Activity {
+
+    private SurfaceHolderCallback surfaceHolderCallback;
+    private native void nativeCustomDataInit();
+    private native long nativeLibInit();
+    private native void nativeFinalize();
+    private long native_custom_data;      // Native code will use this to keep private data
+
 
     private ActivityMainBinding binding;
 
@@ -35,19 +60,28 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     {
         super.onCreate(savedInstanceState);
 
-        nativeCustomDataInit();
-
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        binding.surfaceVideo.getHolder().addCallback(this);
-        setContentView(binding.getRoot());
-        binding.textviewMessage.setText("Starting ... ");
-
         try {
             GStreamer.init(this);
         } catch (Exception e) {
-            binding.textviewMessage.setText("Failed to intialize GStreamer:" + e.getMessage());
+            Log.e("MyGStreamer", "GStreamer.init failed");
         }
-        nativeLibInit();
+
+        nativeCustomDataInit();
+
+        long native_video_overlay_pointer = nativeLibInit();
+        Log.d("MyGStreamer", "nativeLibInit: " + Long.toHexString(native_video_overlay_pointer));
+        surfaceHolderCallback = new SurfaceHolderCallback(native_video_overlay_pointer);
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        binding.surfaceVideo.getHolder().addCallback(surfaceHolderCallback);
+        setContentView(binding.getRoot());
+        binding.textviewMessage.setText("Starting ... ");
+
+//        try {
+//            GStreamer.init(this);
+//        } catch (Exception e) {
+//            binding.textviewMessage.setText("Failed to intialize GStreamer:" + e.getMessage());
+//        }
     }
 
     protected void onDestroy() {
@@ -64,21 +98,4 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
          }
         });
     }
-
-    public void surfaceChanged(SurfaceHolder holder, int format, int width,
-                               int height) {
-         Log.d("MainGStreamer", "Surface changed to format " + format + " width "
-                 + width + " height " + height);
-         nativeSurfaceInit (holder.getSurface());
-    }
-
-    public void surfaceCreated(SurfaceHolder holder) {
-         Log.d("MainGStreamer", "Surface created: " + holder.getSurface());
-    }
-
-    public void surfaceDestroyed(SurfaceHolder holder) {
-         Log.d("MainGStreamer", "Surface destroyed");
-         nativeSurfaceFinalize();
-    }
-
 }
