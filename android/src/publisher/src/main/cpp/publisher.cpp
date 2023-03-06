@@ -14,7 +14,6 @@
 
 typedef struct _CustomData
 {
-
     pthread_t gst_app_thread;
     jobject app;
     GstElement* pipeline;
@@ -50,7 +49,7 @@ struct ErrorCbData {
     jobject object;
 };
 
-static void error_cb(GstBus *bus, GstMessage *message, CustomData *data) {
+static void error_cb(GstBus *bus, GstMessage *message, jobject app) {
     GError *error;
     gchar *debug_info;
     gst_message_parse_error(message, &error, &debug_info);
@@ -58,22 +57,23 @@ static void error_cb(GstBus *bus, GstMessage *message, CustomData *data) {
                                                   GST_OBJECT_NAME(message->src), error->message);
     g_clear_error(&error);
     g_free(debug_info);
-    set_ui_message(message_string, get_jni_env_from_java_vm(java_vm), data->app);
+    set_ui_message(message_string, get_jni_env_from_java_vm(java_vm), app);
     g_free(message_string);
 }
 
-static void state_changed_cb(GstBus *bus, GstMessage *message, CustomData *data) {
+static void state_changed_cb(GstBus *bus, GstMessage *message, jobject app) {
     GstState old_state;
     GstState new_state;
     GstState pending_state;
     gst_message_parse_state_changed(message, &old_state, &new_state, &pending_state);
     // Only show messages coming from the pipeline, not its children
-    if (GST_MESSAGE_SRC(message) == GST_OBJECT(data->pipeline))
+
+    if (GST_IS_PIPELINE(GST_MESSAGE_SRC(message)))
     {
         JNIEnv *const jni_env = get_jni_env_from_java_vm(java_vm);
         gchar *const message = g_strdup_printf("State changed to %s", gst_element_state_get_name(new_state));
         __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "%s", message);
-        set_ui_message(message, jni_env, data->app);
+        set_ui_message(message, jni_env, app);
         g_free(message);
     }
 }
@@ -168,8 +168,8 @@ static void* app_function(void* userdata)
     g_source_attach(bus_source, context);
     g_source_unref(bus_source);
 
-    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, data);
-    g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback)state_changed_cb, data);
+    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, data->app);
+    g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback)state_changed_cb, data->app);
     gst_object_unref(bus);
 
     data->main_loop = g_main_loop_new(context, FALSE);
