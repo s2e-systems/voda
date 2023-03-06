@@ -14,13 +14,14 @@
 
 typedef struct _CustomData
 {
-    JavaVM* java_vm;
+
     pthread_t gst_app_thread;
     jobject app;
     GstElement* pipeline;
     GMainLoop* main_loop;
 } CustomData;
 
+JavaVM* java_vm;
 
 /*
  * Private methods
@@ -57,7 +58,7 @@ static void error_cb(GstBus *bus, GstMessage *message, CustomData *data) {
                                                   GST_OBJECT_NAME(message->src), error->message);
     g_clear_error(&error);
     g_free(debug_info);
-    set_ui_message(message_string, get_jni_env_from_java_vm(data->java_vm), data->app);
+    set_ui_message(message_string, get_jni_env_from_java_vm(java_vm), data->app);
     g_free(message_string);
 }
 
@@ -69,7 +70,7 @@ static void state_changed_cb(GstBus *bus, GstMessage *message, CustomData *data)
     // Only show messages coming from the pipeline, not its children
     if (GST_MESSAGE_SRC(message) == GST_OBJECT(data->pipeline))
     {
-        JNIEnv *const jni_env = get_jni_env_from_java_vm(data->java_vm);
+        JNIEnv *const jni_env = get_jni_env_from_java_vm(java_vm);
         gchar *const message = g_strdup_printf("State changed to %s", gst_element_state_get_name(new_state));
         __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "%s", message);
         set_ui_message(message, jni_env, data->app);
@@ -151,7 +152,7 @@ static void* app_function(void* userdata)
     CustomData* data = (CustomData*)userdata;
 
     JNIEnv* env;
-    if (data->java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+    if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
         __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Failed to attach current thread");
         return NULL;
     }
@@ -182,7 +183,7 @@ static void* app_function(void* userdata)
     gst_element_set_state(data->pipeline, GST_STATE_NULL);
     gst_object_unref(data->pipeline);
 
-    if (data->java_vm->DetachCurrentThread() != JNI_OK) {
+    if (java_vm->DetachCurrentThread() != JNI_OK) {
         __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Failed to detach current thread");
         return NULL;
     }
@@ -204,9 +205,6 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "nativeLibInit");
     jfieldID custom_data_field_id = env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
-    JavaVM* java_vm;
-    env->GetJavaVM(&java_vm);
-    data->java_vm = java_vm;
     data->app = env->NewGlobalRef(thiz);
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Created GlobalRef for app object at %p for %p", data->app, thiz);
     GError* error = NULL;
@@ -301,6 +299,7 @@ nativeSurfaceFinalize(JNIEnv * env, jobject thiz, jobject surface)
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved)
 {
+    java_vm = vm;
     JNIEnv* env = NULL;
     if (vm->GetEnv((void**)&env, JNI_VERSION_1_4) != JNI_OK) {
         return JNI_ERR;
