@@ -14,7 +14,6 @@
 
 typedef struct _CustomData
 {
-    pthread_t gst_app_thread;
     GstElement* pipeline;
     GMainLoop* main_loop;
 } CustomData;
@@ -270,18 +269,21 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
     {
         __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Could not retrieve video sink");
     }
-    pthread_create(&data->gst_app_thread, NULL, &app_function, data);
+    pthread_t gst_app_thread;
+    pthread_create(&gst_app_thread, NULL, &app_function, data);
+    jfieldID gst_app_thread_field_id = env->GetFieldID(env->GetObjectClass(thiz), "gst_app_thread", "J");
+    env->SetLongField(thiz, gst_app_thread_field_id, gst_app_thread);
+
     return reinterpret_cast<jlong>(video_sink);
 }
 
-extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz, jobject app)
+extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz, jobject app, long gst_app_thread)
 {
     jfieldID custom_data_field_id = env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
-    if (!data)
-        return;
+
     g_main_loop_quit(data->main_loop);
-    pthread_join(data->gst_app_thread, NULL);
+    pthread_join(gst_app_thread, NULL);
     env->DeleteGlobalRef(app);
     g_free(data);
     env->SetLongField(thiz, custom_data_field_id, 0);
@@ -316,7 +318,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     static const JNINativeMethod methods[] = {
     {"nativeCustomDataInit", "()V", reinterpret_cast<void*>(nativeCustomDataInit)},
     {"nativeLibInit", "()J", reinterpret_cast<void*>(nativeLibInit)},
-    {"nativeFinalize", "(Ljava/lang/Object;)V", reinterpret_cast<void*>(nativeFinalize)},
+    {"nativeFinalize", "(Ljava/lang/Object;J)V", reinterpret_cast<void*>(nativeFinalize)},
     };
     int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
     if (rc != JNI_OK) return rc;
