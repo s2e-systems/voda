@@ -44,9 +44,9 @@ public class MainActivity extends Activity {
     private SurfaceHolderCallback surfaceHolderCallback;
     private native void nativeCustomDataInit();
     private native long nativeLibInit();
-    private native void nativeFinalize();
+    private native void nativeFinalize(Object app);
     private long native_custom_data;      // Native code will use this to keep private data
-
+    private Object app;
 
     private ActivityMainBinding binding;
 
@@ -85,7 +85,7 @@ public class MainActivity extends Activity {
     }
 
     protected void onDestroy() {
-        nativeFinalize();
+        nativeFinalize(this.app);
         super.onDestroy();
     }
 

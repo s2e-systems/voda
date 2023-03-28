@@ -15,7 +15,6 @@
 typedef struct _CustomData
 {
     pthread_t gst_app_thread;
-    jobject app;
     GstElement* pipeline;
     GMainLoop* main_loop;
 } CustomData;
@@ -161,15 +160,11 @@ static void* app_function(void* userdata)
 
     GstBus* bus = gst_element_get_bus(data->pipeline);
     GSource* bus_source = gst_bus_create_watch(bus);
-
     // Instruct the bus to emit signals for each received message
     g_source_set_callback(bus_source, (GSourceFunc)gst_bus_async_signal_func,
                           NULL, NULL);
     g_source_attach(bus_source, context);
     g_source_unref(bus_source);
-
-    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, data->app);
-    g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback)state_changed_cb, data->app);
     gst_object_unref(bus);
 
     data->main_loop = g_main_loop_new(context, FALSE);
@@ -205,8 +200,12 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "nativeLibInit");
     jfieldID custom_data_field_id = env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
-    data->app = env->NewGlobalRef(thiz);
-    __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Created GlobalRef for app object at %p for %p", data->app, thiz);
+
+    jobject app = env->NewGlobalRef(thiz);
+    jfieldID app_field_id = env->GetFieldID(env->GetObjectClass(thiz), "app", "Ljava/lang/Object;");
+    env->SetObjectField(thiz, app_field_id, app);
+
+    __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Created GlobalRef for app object at %p for %p", app, thiz);
     GError* error = NULL;
 
     data->pipeline = gst_parse_launch("ahcsrc device=1 ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",&error);
@@ -215,9 +214,15 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
         __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "gst_parse_launch failed");
         gchar* message = g_strdup_printf("Unable to build pipeline: %s", error->message);
         g_clear_error(&error);
-        set_ui_message(message, env, data->app);
+        set_ui_message(message, env, app);
         g_free(message);
     }
+
+    GstBus* bus = gst_element_get_bus(data->pipeline);
+    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, app);
+    g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback)state_changed_cb, app);
+    gst_object_unref(bus);
+
 
     GstElement* app_sink = gst_bin_get_by_name(GST_BIN(data->pipeline), "app_sink");
     if (!app_sink)
@@ -269,7 +274,7 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
     return reinterpret_cast<jlong>(video_sink);
 }
 
-extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz)
+extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz, jobject app)
 {
     jfieldID custom_data_field_id = env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
     CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
@@ -277,7 +282,7 @@ extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz)
         return;
     g_main_loop_quit(data->main_loop);
     pthread_join(data->gst_app_thread, NULL);
-    env->DeleteGlobalRef(data->app);
+    env->DeleteGlobalRef(app);
     g_free(data);
     env->SetLongField(thiz, custom_data_field_id, 0);
 
@@ -311,7 +316,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     static const JNINativeMethod methods[] = {
     {"nativeCustomDataInit", "()V", reinterpret_cast<void*>(nativeCustomDataInit)},
     {"nativeLibInit", "()J", reinterpret_cast<void*>(nativeLibInit)},
-    {"nativeFinalize", "()V", reinterpret_cast<void*>(nativeFinalize)},
+    {"nativeFinalize", "(Ljava/lang/Object;)V", reinterpret_cast<void*>(nativeFinalize)},
     };
     int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
     if (rc != JNI_OK) return rc;
