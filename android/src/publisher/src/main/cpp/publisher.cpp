@@ -12,11 +12,12 @@
 #include <gst/app/gstappsink.h>
 #include <pthread.h>
 
-typedef struct _CustomData
+struct ThreadData
 {
     GstElement* pipeline;
     GMainLoop* main_loop;
-} CustomData;
+    GMainContext* context;
+};
 
 JavaVM* java_vm;
 
@@ -41,11 +42,6 @@ static void set_ui_message(const gchar *message, JNIEnv *jni_env, jobject app) {
     }
     jni_env->DeleteLocalRef(jmessage);
 }
-
-struct ErrorCbData {
-    JNIEnv* jni_env;
-    jobject object;
-};
 
 static void error_cb(GstBus *bus, GstMessage *message, jobject app) {
     GError *error;
@@ -147,35 +143,25 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 /* Main method for the native code. This is executed on its own thread. */
 static void* app_function(void* userdata)
 {
-    CustomData* data = (CustomData*)userdata;
+    ThreadData* data = (ThreadData*)userdata;
 
     JNIEnv* env;
     if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
         __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Failed to attach current thread");
         return NULL;
     }
-    GMainContext* context = g_main_context_new();
-    g_main_context_push_thread_default(context);
+    g_main_context_push_thread_default(data->context);
 
-    GstBus* bus = gst_element_get_bus(data->pipeline);
-    GSource* bus_source = gst_bus_create_watch(bus);
-    // Instruct the bus to emit signals for each received message
-    g_source_set_callback(bus_source, (GSourceFunc)gst_bus_async_signal_func,
-                          NULL, NULL);
-    g_source_attach(bus_source, context);
-    g_source_unref(bus_source);
-    gst_object_unref(bus);
-
-    data->main_loop = g_main_loop_new(context, FALSE);
     gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
     g_main_loop_run(data->main_loop);
 
     g_main_loop_unref(data->main_loop);
     data->main_loop = NULL;
-    g_main_context_pop_thread_default(context);
-    g_main_context_unref(context);
+    g_main_context_pop_thread_default(data->context);
+    g_main_context_unref(data->context);
     gst_element_set_state(data->pipeline, GST_STATE_NULL);
     gst_object_unref(data->pipeline);
+    delete data;
 
     if (java_vm->DetachCurrentThread() != JNI_OK) {
         __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Failed to detach current thread");
@@ -188,17 +174,10 @@ static void* app_function(void* userdata)
  * Java Bindings
  */
 
-extern "C" JNIEXPORT void JNICALL nativeCustomDataInit(JNIEnv * env, jobject thiz) {
-    CustomData* data = g_new0(CustomData, 1);
-    jfieldID custom_data_field_id = env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    env->SetLongField(thiz, custom_data_field_id, (jlong)data);
-}
 
 extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
 {
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "nativeLibInit");
-    jfieldID custom_data_field_id = env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
 
     jobject app = env->NewGlobalRef(thiz);
     jfieldID app_field_id = env->GetFieldID(env->GetObjectClass(thiz), "app", "Ljava/lang/Object;");
@@ -206,6 +185,9 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
 
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Created GlobalRef for app object at %p for %p", app, thiz);
     GError* error = NULL;
+
+
+    auto data = new ThreadData;
 
     data->pipeline = gst_parse_launch("ahcsrc device=1 ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",&error);
     if (error)
@@ -220,8 +202,6 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
     GstBus* bus = gst_element_get_bus(data->pipeline);
     g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)error_cb, app);
     g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback)state_changed_cb, app);
-    gst_object_unref(bus);
-
 
     GstElement* app_sink = gst_bin_get_by_name(GST_BIN(data->pipeline), "app_sink");
     if (!app_sink)
@@ -269,24 +249,35 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
     {
         __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Could not retrieve video sink");
     }
+
+    data->context = g_main_context_new();
+
+    GSource* bus_source = gst_bus_create_watch(bus);
+    // Instruct the bus to emit signals for each received message
+    g_source_set_callback(bus_source, (GSourceFunc)gst_bus_async_signal_func,NULL, NULL);
+    g_source_attach(bus_source, data->context);
+    g_source_unref(bus_source);
+    gst_object_unref(bus);
+
+    data->main_loop = g_main_loop_new(data->context, FALSE);
+
+    jfieldID main_loop_field_id = env->GetFieldID(env->GetObjectClass(thiz), "main_loop", "J");
+    env->SetLongField(thiz, main_loop_field_id, (jlong)data->main_loop);
+
     pthread_t gst_app_thread;
-    pthread_create(&gst_app_thread, NULL, &app_function, data);
+    pthread_create(&gst_app_thread, NULL, &app_function, (void*)data);
+
     jfieldID gst_app_thread_field_id = env->GetFieldID(env->GetObjectClass(thiz), "gst_app_thread", "J");
     env->SetLongField(thiz, gst_app_thread_field_id, gst_app_thread);
 
     return reinterpret_cast<jlong>(video_sink);
 }
 
-extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz, jobject app, long gst_app_thread)
+extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz, jobject app, jlong gst_app_thread, jlong main_loop)
 {
-    jfieldID custom_data_field_id = env->GetFieldID(env->GetObjectClass(thiz), "native_custom_data", "J");
-    CustomData* data = (CustomData *)env->GetLongField(thiz, custom_data_field_id);
-
-    g_main_loop_quit(data->main_loop);
+    g_main_loop_quit((GMainLoop*)main_loop);
     pthread_join(gst_app_thread, NULL);
     env->DeleteGlobalRef(app);
-    g_free(data);
-    env->SetLongField(thiz, custom_data_field_id, 0);
 
     delete data_writer;
     delete domain_participant;
@@ -316,9 +307,8 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     if (c == nullptr) return JNI_ERR;
 
     static const JNINativeMethod methods[] = {
-    {"nativeCustomDataInit", "()V", reinterpret_cast<void*>(nativeCustomDataInit)},
     {"nativeLibInit", "()J", reinterpret_cast<void*>(nativeLibInit)},
-    {"nativeFinalize", "(Ljava/lang/Object;J)V", reinterpret_cast<void*>(nativeFinalize)},
+    {"nativeFinalize", "(Ljava/lang/Object;JJ)V", reinterpret_cast<void*>(nativeFinalize)},
     };
     int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
     if (rc != JNI_OK) return rc;

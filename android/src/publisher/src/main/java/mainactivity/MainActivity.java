@@ -42,12 +42,11 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
 public class MainActivity extends Activity {
 
     private SurfaceHolderCallback surfaceHolderCallback;
-    private native void nativeCustomDataInit();
     private native long nativeLibInit();
-    private native void nativeFinalize(Object app, long gst_app_thread);
-    private long native_custom_data;      // Native code will use this to keep private data
+    private native void nativeFinalize(Object app, long gst_app_thread, long main_loop);
     private Object app;
     private long gst_app_thread;
+    private long main_loop;
 
     private ActivityMainBinding binding;
 
@@ -67,8 +66,6 @@ public class MainActivity extends Activity {
             Log.e("MyGStreamer", "GStreamer.init failed");
         }
 
-        nativeCustomDataInit();
-
         long native_video_overlay_pointer = nativeLibInit();
         Log.d("MyGStreamer", "nativeLibInit: " + Long.toHexString(native_video_overlay_pointer));
         surfaceHolderCallback = new SurfaceHolderCallback(native_video_overlay_pointer);
@@ -77,16 +74,10 @@ public class MainActivity extends Activity {
         binding.surfaceVideo.getHolder().addCallback(surfaceHolderCallback);
         setContentView(binding.getRoot());
         binding.textviewMessage.setText("Starting ... ");
-
-//        try {
-//            GStreamer.init(this);
-//        } catch (Exception e) {
-//            binding.textviewMessage.setText("Failed to intialize GStreamer:" + e.getMessage());
-//        }
     }
 
     protected void onDestroy() {
-        nativeFinalize(this.app, this.gst_app_thread);
+        nativeFinalize(this.app, this.gst_app_thread, this.main_loop);
         super.onDestroy();
     }
 
