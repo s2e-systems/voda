@@ -12,6 +12,37 @@
 #include <gst/app/gstappsink.h>
 #include <pthread.h>
 
+static JavaVM* java_vm;
+
+#include <dds/dds.hpp>
+#include "VideoDDS.hpp"
+
+using namespace org::eclipse::cyclonedds;
+
+struct DomainParticipant {
+    DomainParticipant(): dp{ domain::default_id() } {}
+    dds::domain::DomainParticipant dp;
+};
+
+template <typename T> struct DataWriter {
+    DataWriter(const dds::pub::Publisher& pub,
+               const ::dds::topic::Topic<T>& topic,
+               const dds::pub::qos::DataWriterQos& qos,
+               dds::pub::DataWriterListener<T>* listener = NULL,
+               const dds::core::status::StatusMask& mask = ::dds::core::status::StatusMask::none()):
+            data_writer{ pub, topic, qos, listener, mask } {}
+
+    dds::pub::DataWriter<S2E::Video> data_writer;
+};
+
+class Publisher {
+    DomainParticipant* domain_participant;
+    DataWriter<S2E::Video>* data_writer;
+public:
+
+};
+
+
 struct ThreadData
 {
     GstElement* pipeline;
@@ -19,11 +50,6 @@ struct ThreadData
     GMainContext* context;
 };
 
-JavaVM* java_vm;
-
-/*
- * Private methods
- */
 
 static JNIEnv* get_jni_env_from_java_vm(JavaVM* java_vm) {
     JNIEnv* jni_env = nullptr;
@@ -73,29 +99,6 @@ static void state_changed_cb(GstBus *bus, GstMessage *message, jobject app) {
 }
 
 
-/////////////////////
-//  DDS
-
-#include <dds/dds.hpp>
-#include "VideoDDS.hpp"
-
-using namespace org::eclipse::cyclonedds;
-
-struct DomainParticipant {
-    DomainParticipant(): dp{ domain::default_id() } {}
-    dds::domain::DomainParticipant dp;
-};
-template <typename T>
-struct DataWriter {
-    DataWriter(const dds::pub::Publisher& pub,
-        const ::dds::topic::Topic<T>& topic,
-        const dds::pub::qos::DataWriterQos& qos,
-        dds::pub::DataWriterListener<T>* listener = NULL,
-        const dds::core::status::StatusMask& mask = ::dds::core::status::StatusMask::none()):
-        data_writerr{ pub, topic, qos, listener, mask } {}
-
-    dds::pub::DataWriter<S2E::Video> data_writerr;
-};
 DomainParticipant* domain_participant;
 DataWriter<S2E::Video>* data_writer;
 
@@ -136,10 +139,6 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 }
 
 
-//  END DDS
-///////////////////
-
-
 /* Main method for the native code. This is executed on its own thread. */
 static void* app_function(void* userdata)
 {
@@ -170,24 +169,29 @@ static void* app_function(void* userdata)
     return NULL;
 }
 
-/*
- * Java Bindings
- */
 
-
-extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
+jint JNI_OnLoad(JavaVM* vm, void* reserved)
 {
+    java_vm = vm;
+    return JNI_VERSION_1_4;
+}
+
+ThreadData* data;
+pthread_t gst_app_thread;
+jobject app;
+
+extern "C"
+JNIEXPORT jlong JNICALL
+Java_mainactivity_MainActivity_nativeLibInit(JNIEnv *env, jobject thiz) {
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "nativeLibInit");
 
-    jobject app = env->NewGlobalRef(thiz);
-    jfieldID app_field_id = env->GetFieldID(env->GetObjectClass(thiz), "app", "Ljava/lang/Object;");
-    env->SetObjectField(thiz, app_field_id, app);
+    app = env->NewGlobalRef(thiz);
 
     __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "Created GlobalRef for app object at %p for %p", app, thiz);
     GError* error = NULL;
 
 
-    auto data = new ThreadData;
+    data = new ThreadData;
 
     data->pipeline = gst_parse_launch("ahcsrc device=1 ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",&error);
     if (error)
@@ -260,67 +264,33 @@ extern "C" JNIEXPORT long JNICALL nativeLibInit(JNIEnv * env, jobject thiz)
     gst_object_unref(bus);
 
     data->main_loop = g_main_loop_new(data->context, FALSE);
-
-    jfieldID main_loop_field_id = env->GetFieldID(env->GetObjectClass(thiz), "main_loop", "J");
-    env->SetLongField(thiz, main_loop_field_id, (jlong)data->main_loop);
-
-    pthread_t gst_app_thread;
     pthread_create(&gst_app_thread, NULL, &app_function, (void*)data);
-
-    jfieldID gst_app_thread_field_id = env->GetFieldID(env->GetObjectClass(thiz), "gst_app_thread", "J");
-    env->SetLongField(thiz, gst_app_thread_field_id, gst_app_thread);
 
     return reinterpret_cast<jlong>(video_sink);
 }
 
-extern "C" JNIEXPORT void JNICALL nativeFinalize(JNIEnv * env, jobject thiz, jobject app, jlong gst_app_thread, jlong main_loop)
-{
-    g_main_loop_quit((GMainLoop*)main_loop);
+extern "C"
+JNIEXPORT void JNICALL
+Java_mainactivity_MainActivity_nativeFinalize__(JNIEnv *env, jobject thiz) {
+    g_main_loop_quit((GMainLoop*)data->main_loop);
     pthread_join(gst_app_thread, NULL);
+
     env->DeleteGlobalRef(app);
 
     delete data_writer;
     delete domain_participant;
 }
 
-extern "C" JNIEXPORT void JNICALL nativeSurfaceInit(JNIEnv* env, jobject thiz, jobject surface, long video_sink)
-{
+extern "C"
+JNIEXPORT void JNICALL
+Java_mainactivity_SurfaceHolderCallback_nativeSurfaceInit(JNIEnv *env, jobject thiz,
+                                                          jobject surface, jlong video_sink) {
     auto native_window = reinterpret_cast<guintptr>(ANativeWindow_fromSurface(env, surface));
     gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(video_sink), native_window);
 }
-
-extern "C" JNIEXPORT void JNICALL
-nativeSurfaceFinalize(JNIEnv * env, jobject thiz, jobject surface)
-{
+extern "C"
+JNIEXPORT void JNICALL
+Java_mainactivity_SurfaceHolderCallback_nativeSurfaceFinalize(JNIEnv *env, jobject thiz,
+                                                              jobject surface) {
     ANativeWindow_release(ANativeWindow_fromSurface(env, surface));
-}
-
-jint JNI_OnLoad(JavaVM* vm, void* reserved)
-{
-    java_vm = vm;
-    JNIEnv* env = NULL;
-    if (vm->GetEnv((void**)&env, JNI_VERSION_1_4) != JNI_OK) {
-        return JNI_ERR;
-    }
-
-    jclass c = env->FindClass("mainactivity/MainActivity");
-    if (c == nullptr) return JNI_ERR;
-
-    static const JNINativeMethod methods[] = {
-    {"nativeLibInit", "()J", reinterpret_cast<void*>(nativeLibInit)},
-    {"nativeFinalize", "(Ljava/lang/Object;JJ)V", reinterpret_cast<void*>(nativeFinalize)},
-    };
-    int rc = env->RegisterNatives(c, methods, sizeof(methods)/sizeof(JNINativeMethod));
-    if (rc != JNI_OK) return rc;
-
-    jclass c2 = env->FindClass("mainactivity/SurfaceHolderCallback");
-    if (c2 == nullptr) return JNI_ERR;
-    static const JNINativeMethod methods2[] = {
-            {"nativeSurfaceInit", "(Ljava/lang/Object;J)V", reinterpret_cast<void*>(nativeSurfaceInit)},
-            {"nativeSurfaceFinalize", "(Ljava/lang/Object;)V", reinterpret_cast<void*>(nativeSurfaceFinalize)},
-    };
-    int rc2 = env->RegisterNatives(c2, methods2, sizeof(methods2)/sizeof(JNINativeMethod));
-    if (rc2 != JNI_OK) return rc2;
-
-    return JNI_VERSION_1_4;
 }

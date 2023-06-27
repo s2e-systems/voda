@@ -41,12 +41,8 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
 
 public class MainActivity extends Activity {
 
-    private SurfaceHolderCallback surfaceHolderCallback;
     private native long nativeLibInit();
-    private native void nativeFinalize(Object app, long gst_app_thread, long main_loop);
-    private Object app;
-    private long gst_app_thread;
-    private long main_loop;
+    private native void nativeFinalize();
 
     private ActivityMainBinding binding;
 
@@ -68,7 +64,7 @@ public class MainActivity extends Activity {
 
         long native_video_overlay_pointer = nativeLibInit();
         Log.d("MyGStreamer", "nativeLibInit: " + Long.toHexString(native_video_overlay_pointer));
-        surfaceHolderCallback = new SurfaceHolderCallback(native_video_overlay_pointer);
+        SurfaceHolderCallback surfaceHolderCallback = new SurfaceHolderCallback(native_video_overlay_pointer);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         binding.surfaceVideo.getHolder().addCallback(surfaceHolderCallback);
@@ -77,7 +73,7 @@ public class MainActivity extends Activity {
     }
 
     protected void onDestroy() {
-        nativeFinalize(this.app, this.gst_app_thread, this.main_loop);
+        nativeFinalize();
         super.onDestroy();
     }
 
