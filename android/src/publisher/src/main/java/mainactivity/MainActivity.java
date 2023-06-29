@@ -1,7 +1,6 @@
 package mainactivity;
 
 import android.os.Bundle;
-import android.os.Handler;
 import android.widget.TextView;
 
 import mainactivity.databinding.ActivityMainBinding;
@@ -9,19 +8,18 @@ import mainactivity.databinding.ActivityMainBinding;
 import android.app.Activity;
 import android.util.Log;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 
 
 import org.freedesktop.gstreamer.GStreamer;
 
 class SurfaceHolderCallback implements SurfaceHolder.Callback {
-    private native void nativeSurfaceInit(Object surface, long video_sink);
-    private native void nativeSurfaceFinalize(Object surface);
+    final long video_sink;
 
     SurfaceHolderCallback(long video_sink) {
         this.video_sink = video_sink;
     }
-    long video_sink;
+    private native void nativeSurfaceInit(Object surface, long video_sink);
+    private native void nativeSurfaceFinalize(Object surface);
 
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
         Log.d("MainGStreamer", "Surface changed to format " + format + " width "
@@ -29,20 +27,17 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
         nativeSurfaceInit(holder.getSurface(), this.video_sink);
     }
 
-    public void surfaceCreated(SurfaceHolder holder) {
-        Log.d("MainGStreamer", "Surface created: " + holder.getSurface());
-    }
+    public void surfaceCreated(SurfaceHolder holder) {}
 
     public void surfaceDestroyed(SurfaceHolder holder) {
-        Log.d("MainGStreamer", "Surface destroyed");
         nativeSurfaceFinalize(holder.getSurface());
     }
 }
 
 public class MainActivity extends Activity {
 
-    private native long nativeLibInit();
-    private native void nativeFinalize();
+    private native long nativePublisherInit();
+    private native void nativePublisherFinalize();
 
     private ActivityMainBinding binding;
 
@@ -62,9 +57,7 @@ public class MainActivity extends Activity {
             Log.e("MyGStreamer", "GStreamer.init failed");
         }
 
-        long native_video_overlay_pointer = nativeLibInit();
-        Log.d("MyGStreamer", "nativeLibInit: " + Long.toHexString(native_video_overlay_pointer));
-        SurfaceHolderCallback surfaceHolderCallback = new SurfaceHolderCallback(native_video_overlay_pointer);
+        SurfaceHolderCallback surfaceHolderCallback = new SurfaceHolderCallback(nativePublisherInit());
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         binding.surfaceVideo.getHolder().addCallback(surfaceHolderCallback);
@@ -73,7 +66,7 @@ public class MainActivity extends Activity {
     }
 
     protected void onDestroy() {
-        nativeFinalize();
+        nativePublisherFinalize();
         super.onDestroy();
     }
 
