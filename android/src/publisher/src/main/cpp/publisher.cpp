@@ -1,26 +1,18 @@
 #include <jni.h>
-#include <gst/gst.h>
-#include <string>
 #include <android/log.h>
-
-#include <stdint.h>
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 #include <gst/gst.h>
 #include <gst/gstbin.h>
 #include <gst/video/video.h>
 #include <gst/app/gstappsink.h>
-#include <pthread.h>
 #include <dds/dds.hpp>
 #include "VideoDDS.hpp"
+#include <string>
+#include <stdint.h>
+#include <thread>
 
 using namespace org::eclipse::cyclonedds;
-
-struct ThreadData {
-    GstElement *pipeline;
-    GMainLoop *main_loop;
-    GMainContext *context;
-};
 
 
 static JNIEnv *get_jni_env_from_java_vm(JavaVM *java_vm) {
@@ -67,7 +59,7 @@ static void state_changed_cb(GstBus *bus, GstMessage *message, jobject app) {
         JNIEnv *const jni_env = get_jni_env_from_java_vm(JAVA_VM);
         gchar *const message = g_strdup_printf("State changed to %s",
                                                gst_element_state_get_name(new_state));
-        __android_log_print(ANDROID_LOG_INFO, "MyGStreamer", "%s", message);
+        __android_log_print(ANDROID_LOG_INFO, "PublisherInit", "%s", message);
         set_ui_message(message, jni_env, app);
         g_free(message);
     }
@@ -105,34 +97,28 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink *appSink, gpointer userD
 }
 
 
-/* Main method for the native code. This is executed on its own thread. */
-static void *app_function(void *userdata) {
-    ThreadData *data = (ThreadData *) userdata;
+static void thread_function(GstElement *pipeline, GMainLoop *main_loop, GMainContext *context) {
 
     JNIEnv *env;
     if (JAVA_VM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-        __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Failed to attach current thread");
-        return NULL;
+        __android_log_print(ANDROID_LOG_ERROR, "PublisherInit", "Failed to attach current thread");
+        return;
     }
-    g_main_context_push_thread_default(data->context);
+    g_main_context_push_thread_default(context);
 
-    gst_element_set_state(data->pipeline, GST_STATE_PLAYING);
-    g_main_loop_run(data->main_loop);
+    gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    g_main_loop_run(main_loop);
 
-    g_main_loop_unref(data->main_loop);
-    data->main_loop = NULL;
-    g_main_context_pop_thread_default(data->context);
-    g_main_context_unref(data->context);
-    gst_element_set_state(data->pipeline, GST_STATE_NULL);
-    gst_object_unref(data->pipeline);
+    g_main_loop_unref(main_loop);
+    g_main_context_pop_thread_default(context);
+    g_main_context_unref(context);
+    gst_element_set_state(pipeline, GST_STATE_NULL);
+    gst_object_unref(pipeline);
 
     if (JAVA_VM->DetachCurrentThread() != JNI_OK) {
-        __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Failed to detach current thread");
-        return NULL;
+        __android_log_print(ANDROID_LOG_ERROR, "PublisherInit", "Failed to detach current thread");
     }
-    return NULL;
 }
-
 
 jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     JAVA_VM = vm;
@@ -143,8 +129,10 @@ class Publisher {
     dds::pub::DataWriter<S2E::Video> m_data_writer;
     jobject m_java_global_ref;
     JNIEnv *m_env;
-    ThreadData *m_data;
-    pthread_t m_gst_app_thread;
+    GstElement *m_pipeline;
+    GMainLoop *m_main_loop;
+    GMainContext *m_context;
+    std::thread* m_thread;
 
 public:
     Publisher(JNIEnv *env, const jobject java_obj, dds::domain::DomainParticipant domain_participant) :
@@ -163,32 +151,28 @@ public:
                           }(),
                           nullptr,
                           dds::core::status::StatusMask::none()
-            }
+            },
+            m_java_global_ref{env->NewGlobalRef(java_obj)}
         {
-        m_java_global_ref = env->NewGlobalRef(java_obj);
         GError *error = nullptr;
-
-        m_data = new ThreadData;
-
-        m_data->pipeline = gst_parse_launch(
-                "ahcsrc device=1 ! video/x-raw,format=NV21 ! videoconvert ! tee name=t ! queue leaky=2 ! autovideosink  t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
+        m_pipeline = gst_parse_launch(
+                "ahcsrc device=1 ! video/x-raw,format=NV21 ! videoconvert ! "
+                "tee name=t ! queue leaky=2 ! autovideosink  "
+                "t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
                 &error);
         if (error) {
-            __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "gst_parse_launch failed");
-            gchar *message = g_strdup_printf("Unable to build pipeline: %s", error->message);
+            const std::string error_msg(std::string("Unable to build pipeline: ") + std::string(error->message));
             g_clear_error(&error);
-            set_ui_message(message, env, m_java_global_ref);
-            g_free(message);
+            throw std::runtime_error(error_msg);
         }
 
-        GstBus *bus = gst_element_get_bus(m_data->pipeline);
+        GstBus *bus = gst_element_get_bus(m_pipeline);
         g_signal_connect(G_OBJECT(bus), "message::error", (GCallback) error_cb, m_java_global_ref);
-        g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback) state_changed_cb,
-                         m_java_global_ref);
+        g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback) state_changed_cb, m_java_global_ref);
 
-        GstElement *app_sink = gst_bin_get_by_name(GST_BIN(m_data->pipeline), "app_sink");
+        GstElement *app_sink = gst_bin_get_by_name(GST_BIN(m_pipeline), "app_sink");
         if (!app_sink) {
-            __android_log_print(ANDROID_LOG_ERROR, "MyGStreamer", "Could not retrieve app_sink");
+            throw std::runtime_error("Could not retrieve app_sink");
         }
 
         g_object_set(app_sink,
@@ -200,32 +184,32 @@ public:
         );
         g_signal_connect(app_sink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
                          reinterpret_cast<gpointer>(&m_data_writer));
+
+
         // Set the pipeline to READY to receive a video_sink
-        gst_element_set_state(m_data->pipeline, GST_STATE_READY);
-        m_data->context = g_main_context_new();
+        gst_element_set_state(m_pipeline, GST_STATE_READY);
+        m_context = g_main_context_new();
 
         GSource *bus_source = gst_bus_create_watch(bus);
         // Instruct the bus to emit signals for each received message
         g_source_set_callback(bus_source, (GSourceFunc) gst_bus_async_signal_func, nullptr,
                               nullptr);
-        g_source_attach(bus_source, m_data->context);
+        g_source_attach(bus_source, m_context);
         g_source_unref(bus_source);
         gst_object_unref(bus);
 
-        m_data->main_loop = g_main_loop_new(m_data->context, FALSE);
-        pthread_create(&m_gst_app_thread, nullptr, &app_function, (void *) m_data);
+        m_main_loop = g_main_loop_new(m_context, FALSE);
+        m_thread = new std::thread(thread_function, m_pipeline, m_main_loop, m_context);
     }
 
     virtual ~Publisher() {
-        g_main_loop_quit((GMainLoop *) m_data->main_loop);
-        pthread_join(m_gst_app_thread, nullptr);
-        delete m_data;
-
+        g_main_loop_quit((GMainLoop *) m_main_loop);
+        m_thread->join();
         m_env->DeleteGlobalRef(m_java_global_ref);
     };
 
     GstElement *video_sink() {
-        return gst_bin_get_by_interface(GST_BIN(m_data->pipeline), GST_TYPE_VIDEO_OVERLAY);
+        return gst_bin_get_by_interface(GST_BIN(m_pipeline), GST_TYPE_VIDEO_OVERLAY);
     }
 };
 
@@ -242,13 +226,14 @@ Java_mainactivity_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz) {
         </Interfaces></General></Domain></CycloneDDS>)", 1);
 
     try {
-        NATIVE_PUBLISHER = new Publisher(env, thiz,
-                                         dds::domain::DomainParticipant{domain::default_id()});
+        NATIVE_PUBLISHER = new Publisher(env, thiz, dds::domain::DomainParticipant{domain::default_id()});
+        return reinterpret_cast<jlong>(NATIVE_PUBLISHER->video_sink());
     } catch (const dds::core::Exception &e) {
-        __android_log_print(ANDROID_LOG_ERROR, "DDS", "DDS initializaion failed with: %s",
-                            e.what());
+        __android_log_print(ANDROID_LOG_ERROR, "DDS", "DDS initializaion failed with: %s", e.what());
+    } catch (const std::runtime_error &e) {
+        __android_log_print(ANDROID_LOG_ERROR, "NativePublisher", "PublisherInit failed with: %s", e.what());
     }
-    return reinterpret_cast<jlong>(NATIVE_PUBLISHER->video_sink());
+    return 0;
 }
 
 extern "C"
