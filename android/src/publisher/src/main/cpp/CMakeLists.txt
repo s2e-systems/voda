@@ -71,7 +71,6 @@ configure_file(
 add_library(gstreamer_android SHARED
         gstreamer_android-1.0.c
 )
-
 set_target_properties(gstreamer_android PROPERTIES
         LINKER_LANGUAGE CXX
 )
@@ -125,7 +124,6 @@ add_library(android_publisher SHARED
         VideoDDS.cpp
         VideoDDS.hpp
 )
-
 target_link_libraries(android_publisher
         CycloneDDS-CXX::ddscxx
         gstreamer_android

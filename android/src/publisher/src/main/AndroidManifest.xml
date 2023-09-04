@@ -14,7 +14,7 @@
         android:label="VoDA Publisher"
         android:supportsRtl="true">
         <activity
-            android:name=".MainActivity"
+            android:name="com.s2e_systems.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

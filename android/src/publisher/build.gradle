@@ -5,7 +5,7 @@ android {
     // Determines the version of Android SDK Platform
     compileSdk 33
     defaultConfig {
-        applicationId 'com.publisher'
+        applicationId 'com.s2e_systems.publisher'
         minSdk 28
     }
     externalNativeBuild {
@@ -15,9 +15,9 @@ android {
         }
     }
     buildFeatures {
-        viewBinding true
+       viewBinding = true
     }
-    namespace 'mainactivity'
+    namespace 'com.s2e_systems.publisher'
     buildDir = new File(rootProject.projectDir, ".build-gradle/" + project.name)
 }
 dependencies {

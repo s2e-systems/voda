@@ -218,7 +218,7 @@ Publisher *NATIVE_PUBLISHER = nullptr;
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_mainactivity_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz) {
+Java_com_s2e_1systems_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz) {
 
     setenv("CYCLONEDDS_URI", R"(<CycloneDDS><Domain><General><Interfaces>
         <NetworkInterface name="eth1" presence_required="false" />
@@ -238,13 +238,13 @@ Java_mainactivity_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_mainactivity_MainActivity_nativePublisherFinalize__(JNIEnv *, jobject) {
+Java_com_s2e_1systems_MainActivity_nativePublisherFinalize__(JNIEnv *, jobject) {
     delete NATIVE_PUBLISHER;
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_mainactivity_SurfaceHolderCallback_nativeSurfaceInit(JNIEnv *env, jobject,
+Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceInit(JNIEnv *env, jobject,
                                                           jobject surface, jlong video_sink) {
     auto native_window = reinterpret_cast<guintptr>(ANativeWindow_fromSurface(env, surface));
     gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(video_sink), native_window);
@@ -252,7 +252,7 @@ Java_mainactivity_SurfaceHolderCallback_nativeSurfaceInit(JNIEnv *env, jobject,
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_mainactivity_SurfaceHolderCallback_nativeSurfaceFinalize(JNIEnv *env, jobject,
+Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceFinalize(JNIEnv *env, jobject,
                                                               jobject surface) {
     ANativeWindow_release(ANativeWindow_fromSurface(env, surface));
 }

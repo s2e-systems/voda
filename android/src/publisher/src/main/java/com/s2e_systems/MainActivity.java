@@ -1,16 +1,16 @@
-package mainactivity;
+package com.s2e_systems;
 
 import android.os.Bundle;
 import android.widget.TextView;
-
-import mainactivity.databinding.ActivityMainBinding;
-
 import android.app.Activity;
 import android.util.Log;
 import android.view.SurfaceHolder;
 
-
 import org.freedesktop.gstreamer.GStreamer;
+
+import com.s2e_systems.publisher.databinding.ActivityMainBinding;
+
+
 
 class SurfaceHolderCallback implements SurfaceHolder.Callback {
     final long video_sink;
@@ -54,7 +54,7 @@ public class MainActivity extends Activity {
         try {
             GStreamer.init(this);
         } catch (Exception e) {
-            Log.e("MyGStreamer", "GStreamer.init failed");
+            Log.e("Publisher", "GStreamer.init failed");
         }
 
         SurfaceHolderCallback surfaceHolderCallback = new SurfaceHolderCallback(nativePublisherInit());
