@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "VoDA"
-include ':src:subscriber'
+//include ':src:subscriber'
 include ':src:publisher'

@@ -6,7 +6,7 @@ option(BUILD_UNIT_TESTS "Weather to build unit tests (requires GoogleTest)" OFF)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(GLib MODULE REQUIRED COMPONENTS glib gobject)
-find_package(GStreamer MODULE REQUIRED COMPONENTS gstreamer base app)
+find_package(GStreamer MODULE REQUIRED COMPONENTS gstreamer base app video)
 find_package(CycloneDDS-CXX REQUIRED)
 idlcxx_generate(TARGET GeneratedIdl FILES src/common/VideoDDS.idl)
 
@@ -52,6 +52,7 @@ target_link_libraries(
           GStreamer::gstreamer
           GStreamer::base
           GStreamer::app
+          GStreamer::video
           CycloneDDS-CXX::ddscxx
           GeneratedIdl)
 target_compile_features(VideoDDSSubscriber PRIVATE cxx_std_17)

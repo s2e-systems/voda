@@ -62,7 +62,8 @@ public class MainActivity extends Activity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         binding.surfaceVideo.getHolder().addCallback(surfaceHolderCallback);
         setContentView(binding.getRoot());
-        binding.textviewMessage.setText("Starting ... ");
+
+        setMessage("Publisher");
     }
 
     protected void onDestroy() {
@@ -73,10 +74,6 @@ public class MainActivity extends Activity {
     // Called from native code. This sets the content of the TextView from the UI thread.
     private void setMessage(final String message) {
         final TextView tv = binding.textviewMessage;
-        runOnUiThread (new Runnable() {
-         public void run() {
-             tv.setText(message);
-         }
-        });
+        runOnUiThread(() -> tv.setText(message));
     }
 }
