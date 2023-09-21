@@ -28,7 +28,7 @@ class Publisher {
     std::thread* m_thread;
     MainActivityBinding m_main_activity_binding;
 public:
-    Publisher(dds::domain::DomainParticipant domain_participant, JNIEnv *jni_env, jobject main_activity);
+    Publisher(const dds::domain::DomainParticipant& domain_participant, JavaVM* java_vm, jobject main_activity);
     virtual ~Publisher();
     GstElement *video_sink();
 };

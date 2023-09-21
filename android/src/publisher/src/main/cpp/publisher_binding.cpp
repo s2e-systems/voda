@@ -9,28 +9,17 @@
 #include <dds/dds.hpp>
 #include "VideoDDS.hpp"
 #include <string>
-#include <stdint.h>
 #include <thread>
 #include "Publisher.h"
 #include "MainActivityBinding.h"
 
 using namespace org::eclipse::cyclonedds;
 
-//static JavaVM *JAVA_VM;
 Publisher *NATIVE_PUBLISHER = nullptr;
 
-//static JNIEnv *get_jni_env_from_java_vm(JavaVM *java_vm) {
-//    JNIEnv *jni_env = nullptr;
-//    java_vm->GetEnv(reinterpret_cast<void **>(&jni_env), JNI_VERSION_1_4);
-//    return jni_env;
-//}
-
-jint JNI_OnLoad(JavaVM *vm, void *reserved) {
-//    JAVA_VM = vm;
+jint JNI_OnLoad(JavaVM *, void *) {
     return JNI_VERSION_1_4;
 }
-
-
 
 extern "C"
 JNIEXPORT jlong JNICALL
@@ -42,7 +31,9 @@ Java_com_s2e_1systems_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz
         </Interfaces></General></Domain></CycloneDDS>)", 1);
 
     try {
-        NATIVE_PUBLISHER = new Publisher(dds::domain::DomainParticipant{domain::default_id()}, env, thiz);
+        JavaVM* java_vm;
+        env->GetJavaVM(&java_vm);
+        NATIVE_PUBLISHER = new Publisher(dds::domain::DomainParticipant{domain::default_id()}, java_vm, thiz);
         return reinterpret_cast<jlong>(NATIVE_PUBLISHER->video_sink());
     } catch (const dds::core::Exception &e) {
         __android_log_print(ANDROID_LOG_ERROR, "DDS", "DDS initializaion failed with: %s", e.what());
@@ -68,6 +59,6 @@ Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceFinalize(JNIEnv *env, j
 }
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_s2e_1systems_MainActivity_nativePublisherFinalize(JNIEnv *env, jobject thiz) {
+Java_com_s2e_1systems_MainActivity_nativePublisherFinalize(JNIEnv *, jobject ) {
     delete NATIVE_PUBLISHER;
 }

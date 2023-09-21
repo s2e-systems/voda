@@ -51,19 +51,23 @@ public class MainActivity extends Activity {
     {
         super.onCreate(savedInstanceState);
 
-        try {
-            GStreamer.init(this);
-        } catch (Exception e) {
-            Log.e("Publisher", "GStreamer.init failed");
-        }
-
-        SurfaceHolderCallback surfaceHolderCallback = new SurfaceHolderCallback(nativePublisherInit());
-
         binding = ActivityMainBinding.inflate(getLayoutInflater());
-        binding.surfaceVideo.getHolder().addCallback(surfaceHolderCallback);
         setContentView(binding.getRoot());
 
         setMessage("Publisher");
+
+        try {
+            GStreamer.init(this);
+        } catch (Exception e) {
+            setMessage("GStreamer init failed");
+        }
+        long video_sink = nativePublisherInit();
+        if (video_sink == 0) {
+            setMessage("Native publisher init failed");
+            return;
+        }
+        SurfaceHolderCallback surfaceHolderCallback = new SurfaceHolderCallback(video_sink);
+        binding.surfaceVideo.getHolder().addCallback(surfaceHolderCallback);
     }
 
     protected void onDestroy() {

@@ -11,12 +11,11 @@
 #include <dds/dds.hpp>
 #include "VideoDDS.hpp"
 #include <string>
-#include <stdint.h>
 #include <thread>
 #include "Publisher.h"
 
 
-static void error_cb(GstBus *bus, GstMessage *gst_message, MainActivityBinding& app) {
+static void error_cb(GstBus *, GstMessage *gst_message, MainActivityBinding& app) {
     GError *error;
     gchar *debug_info;
     gst_message_parse_error(gst_message, &error, &debug_info);
@@ -24,22 +23,20 @@ static void error_cb(GstBus *bus, GstMessage *gst_message, MainActivityBinding& 
                                                   GST_OBJECT_NAME(gst_message->src), error->message);
     g_clear_error(&error);
     g_free(debug_info);
-    const std::string message{g_message};
-//    app.setUiMessage(message);
+    app.setUiMessage(g_message);
     g_free(g_message);
 }
 
-static void state_changed_cb(GstBus *bus, GstMessage *message, MainActivityBinding& app) {
+static void state_changed_cb(GstBus *, GstMessage *gst_message, MainActivityBinding& main_activity_binding) {
     GstState old_state;
     GstState new_state;
     GstState pending_state;
-    gst_message_parse_state_changed(message, &old_state, &new_state, &pending_state);
+    gst_message_parse_state_changed(gst_message, &old_state, &new_state, &pending_state);
     // Only show messages coming from the pipeline, not its children
-    if (GST_IS_PIPELINE(GST_MESSAGE_SRC(message))) {
+    if (GST_IS_PIPELINE(GST_MESSAGE_SRC(gst_message))) {
         gchar *const g_message = g_strdup_printf("State changed to %s",
                                                gst_element_state_get_name(new_state));
-        const std::string message{g_message};
-//        app.setUiMessage(message);
+        main_activity_binding.setUiMessage(g_message);
         g_free(g_message);
     }
 }
@@ -75,10 +72,8 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink *appSink, gpointer userD
     return GST_FLOW_OK;
 }
 
-static void thread_function(JNIEnv *env, GstElement *pipeline, GMainLoop *main_loop, GMainContext *context) {
-    JavaVM* java_vm;
-    env->GetJavaVM(&java_vm);
-    JNIEnv *env2;
+static void thread_function(JavaVM *java_vm, GstElement *pipeline, GMainLoop *main_loop, GMainContext *context) {
+    JNIEnv* env2;
     if (java_vm->AttachCurrentThread(&env2, nullptr) != JNI_OK) {
         __android_log_print(ANDROID_LOG_ERROR, "PublisherInit", "Failed to attach current thread");
         return;
@@ -99,7 +94,7 @@ static void thread_function(JNIEnv *env, GstElement *pipeline, GMainLoop *main_l
     }
 }
 
-Publisher::Publisher(dds::domain::DomainParticipant domain_participant, JNIEnv *jni_env, jobject main_activity) :
+Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, JavaVM* java_vm, jobject main_activity) :
         m_data_writer{dds::pub::Publisher{domain_participant},
                       dds::topic::Topic<S2E::Video>{domain_participant, "VideoStream"},
                       [] {
@@ -115,7 +110,7 @@ Publisher::Publisher(dds::domain::DomainParticipant domain_participant, JNIEnv *
                       nullptr,
                       dds::core::status::StatusMask::none()
         },
-        m_main_activity_binding{jni_env, main_activity}
+        m_main_activity_binding{java_vm, main_activity}
 {
     GError *error = nullptr;
     m_pipeline = gst_parse_launch(
@@ -130,8 +125,8 @@ Publisher::Publisher(dds::domain::DomainParticipant domain_participant, JNIEnv *
     }
 
     GstBus *bus = gst_element_get_bus(m_pipeline);
-    g_signal_connect(G_OBJECT(bus), "message::error", (GCallback) error_cb, &m_main_activity_binding);
-    g_signal_connect(G_OBJECT(bus), "message::state-changed", (GCallback) state_changed_cb, &m_main_activity_binding);
+    g_signal_connect(G_OBJECT(bus), "message::error", G_CALLBACK(error_cb), &m_main_activity_binding);
+    g_signal_connect(G_OBJECT(bus), "message::state-changed", G_CALLBACK(state_changed_cb), &m_main_activity_binding);
 
     GstElement *app_sink = gst_bin_get_by_name(GST_BIN(m_pipeline), "app_sink");
     if (!app_sink) {
@@ -161,13 +156,13 @@ Publisher::Publisher(dds::domain::DomainParticipant domain_participant, JNIEnv *
     gst_object_unref(bus);
 
     m_main_loop = g_main_loop_new(m_context, FALSE);
-    m_thread = new std::thread(thread_function, m_main_activity_binding.jniEnv(), m_pipeline, m_main_loop, m_context);
+    m_thread = new std::thread(thread_function, java_vm, m_pipeline, m_main_loop, m_context);
 }
 
 Publisher::~Publisher() {
     g_main_loop_quit((GMainLoop *) m_main_loop);
     m_thread->join();
-};
+}
 
 GstElement *Publisher::video_sink() {
     return gst_bin_get_by_interface(GST_BIN(m_pipeline), GST_TYPE_VIDEO_OVERLAY);
