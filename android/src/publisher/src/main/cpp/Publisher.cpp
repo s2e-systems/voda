@@ -72,12 +72,7 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink *appSink, gpointer userD
     return GST_FLOW_OK;
 }
 
-static void thread_function(JavaVM *java_vm, GstElement *pipeline, GMainLoop *main_loop, GMainContext *context) {
-    JNIEnv* env2;
-    if (java_vm->AttachCurrentThread(&env2, nullptr) != JNI_OK) {
-        __android_log_print(ANDROID_LOG_ERROR, "PublisherInit", "Failed to attach current thread");
-        return;
-    }
+static void thread_function(GstElement *pipeline, GMainLoop *main_loop, GMainContext *context) {
     g_main_context_push_thread_default(context);
 
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
@@ -88,10 +83,6 @@ static void thread_function(JavaVM *java_vm, GstElement *pipeline, GMainLoop *ma
     g_main_context_unref(context);
     gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(pipeline);
-
-    if (java_vm->DetachCurrentThread() != JNI_OK) {
-        __android_log_print(ANDROID_LOG_ERROR, "PublisherInit", "Failed to detach current thread");
-    }
 }
 
 Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, JavaVM* java_vm, jobject main_activity) :
@@ -156,7 +147,7 @@ Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, J
     gst_object_unref(bus);
 
     m_main_loop = g_main_loop_new(m_context, FALSE);
-    m_thread = new std::thread(thread_function, java_vm, m_pipeline, m_main_loop, m_context);
+    m_thread = new std::thread(thread_function, m_pipeline, m_main_loop, m_context);
 }
 
 Publisher::~Publisher() {
