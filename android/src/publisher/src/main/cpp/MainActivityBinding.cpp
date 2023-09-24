@@ -1,7 +1,6 @@
 #include "MainActivityBinding.h"
 
 #include <android/log.h>
-#include <gst/gst.h>
 
 static JNIEnv* get_jni_interface_pointer(JavaVM* java_vm) {
     JNIEnv *jni_env = nullptr;

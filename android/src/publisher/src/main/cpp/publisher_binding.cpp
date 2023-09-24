@@ -1,16 +1,7 @@
 #include <jni.h>
 #include <android/log.h>
-#include <android/native_window.h>
 #include <android/native_window_jni.h>
-#include <gst/gst.h>
-#include <gst/gstbin.h>
 #include <gst/video/video.h>
-#include <gst/app/gstappsink.h>
-#include <dds/dds.hpp>
-#include "VideoDDS.hpp"
-#include <memory>
-#include <string>
-#include <thread>
 #include "Publisher.h"
 #include "MainActivityBinding.h"
 

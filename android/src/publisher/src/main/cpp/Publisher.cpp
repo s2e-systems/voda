@@ -1,18 +1,8 @@
 #include "Publisher.h"
 
-#include <jni.h>
-#include <android/log.h>
-#include <android/native_window.h>
-#include <android/native_window_jni.h>
-#include <gst/gst.h>
-#include <gst/gstbin.h>
+#include <thread>
 #include <gst/video/video.h>
 #include <gst/app/gstappsink.h>
-#include <dds/dds.hpp>
-#include "VideoDDS.hpp"
-#include <string>
-#include <thread>
-#include "Publisher.h"
 
 
 static void error_cb(GstBus *, GstMessage *gst_message, std::unique_ptr<MainActivityBinding>& main_activity_binding) {
@@ -44,7 +34,6 @@ static void state_changed_cb(GstBus *, GstMessage *gst_message, std::unique_ptr<
 static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink *appSink, gpointer userData) {
     auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video> *>(userData);
     if (dataWriter == nullptr || dataWriter->is_nil()) {
-        __android_log_print(ANDROID_LOG_ERROR, "DDS", "DataWriter not valid");
         return GST_FLOW_ERROR;
     }
 

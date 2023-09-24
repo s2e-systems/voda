@@ -1,19 +1,10 @@
 #ifndef VODA_PUBLISHER_H
 #define VODA_PUBLISHER_H
 
-#include <jni.h>
-#include <android/log.h>
-#include <android/native_window.h>
-#include <android/native_window_jni.h>
+#include <memory>
 #include <gst/gst.h>
-#include <gst/gstbin.h>
-#include <gst/video/video.h>
-#include <gst/app/gstappsink.h>
 #include <dds/dds.hpp>
 #include "VideoDDS.hpp"
-#include <string>
-#include <stdint.h>
-#include <memory>
 #include "MainActivityBinding.h"
 
 using namespace org::eclipse::cyclonedds;
