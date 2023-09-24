@@ -27,7 +27,7 @@ void MainActivityBinding::setUiMessage(const std::string &message) const {
     jni_env->CallVoidMethod(m_main_activity_global_ref, set_message_method_id,
                               j_message);
     if (jni_env->ExceptionCheck()) {
-        __android_log_print(ANDROID_LOG_ERROR, "GStreamer", "Failed to call Java method");
+        __android_log_print(ANDROID_LOG_ERROR, "MainActivityBinding", "Failed to call Java method");
         jni_env->ExceptionClear();
     }
     jni_env->DeleteLocalRef(j_message);

@@ -15,7 +15,7 @@
 #include "Publisher.h"
 
 
-static void error_cb(GstBus *, GstMessage *gst_message, MainActivityBinding& app) {
+static void error_cb(GstBus *, GstMessage *gst_message, std::unique_ptr<MainActivityBinding>& main_activity_binding) {
     GError *error;
     gchar *debug_info;
     gst_message_parse_error(gst_message, &error, &debug_info);
@@ -23,11 +23,11 @@ static void error_cb(GstBus *, GstMessage *gst_message, MainActivityBinding& app
                                                   GST_OBJECT_NAME(gst_message->src), error->message);
     g_clear_error(&error);
     g_free(debug_info);
-    app.setUiMessage(g_message);
+    main_activity_binding->setUiMessage(g_message);
     g_free(g_message);
 }
 
-static void state_changed_cb(GstBus *, GstMessage *gst_message, MainActivityBinding& main_activity_binding) {
+static void state_changed_cb(GstBus *, GstMessage *gst_message, std::unique_ptr<MainActivityBinding>& main_activity_binding) {
     GstState old_state;
     GstState new_state;
     GstState pending_state;
@@ -36,7 +36,7 @@ static void state_changed_cb(GstBus *, GstMessage *gst_message, MainActivityBind
     if (GST_IS_PIPELINE(GST_MESSAGE_SRC(gst_message))) {
         gchar *const g_message = g_strdup_printf("State changed to %s",
                                                gst_element_state_get_name(new_state));
-        main_activity_binding.setUiMessage(g_message);
+        main_activity_binding->setUiMessage(g_message);
         g_free(g_message);
     }
 }
@@ -85,7 +85,7 @@ static void thread_function(GstElement *pipeline, GMainLoop *main_loop, GMainCon
     gst_object_unref(pipeline);
 }
 
-Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, JavaVM* java_vm, jobject main_activity) :
+Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding) :
         m_data_writer{dds::pub::Publisher{domain_participant},
                       dds::topic::Topic<S2E::Video>{domain_participant, "VideoStream"},
                       [] {
@@ -101,7 +101,7 @@ Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, J
                       nullptr,
                       dds::core::status::StatusMask::none()
         },
-        m_main_activity_binding{java_vm, main_activity}
+        m_main_activity_binding{std::move(main_activity_binding)}
 {
     GError *error = nullptr;
     m_pipeline = gst_parse_launch(

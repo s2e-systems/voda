@@ -8,6 +8,7 @@
 #include <gst/app/gstappsink.h>
 #include <dds/dds.hpp>
 #include "VideoDDS.hpp"
+#include <memory>
 #include <string>
 #include <thread>
 #include "Publisher.h"
@@ -33,7 +34,8 @@ Java_com_s2e_1systems_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz
     try {
         JavaVM* java_vm;
         env->GetJavaVM(&java_vm);
-        NATIVE_PUBLISHER = new Publisher(dds::domain::DomainParticipant{domain::default_id()}, java_vm, thiz);
+        std::unique_ptr<MainActivityBinding> main_activity_binding{new MainActivityBinding{java_vm, thiz}};
+        NATIVE_PUBLISHER = new Publisher(dds::domain::DomainParticipant{domain::default_id()}, std::move(main_activity_binding));
         return reinterpret_cast<jlong>(NATIVE_PUBLISHER->video_sink());
     } catch (const dds::core::Exception &e) {
         __android_log_print(ANDROID_LOG_ERROR, "DDS", "DDS initializaion failed with: %s", e.what());

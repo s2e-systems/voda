@@ -10,6 +10,7 @@ class MainActivityBinding {
 
 public:
     MainActivityBinding(JavaVM* java_vm, jobject main_activity);
+    MainActivityBinding(MainActivityBinding&) = default;
 
     virtual ~MainActivityBinding();
 

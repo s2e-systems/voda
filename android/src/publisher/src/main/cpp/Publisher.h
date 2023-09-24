@@ -13,12 +13,10 @@
 #include "VideoDDS.hpp"
 #include <string>
 #include <stdint.h>
-#include <thread>
-#include "Publisher.h"
+#include <memory>
 #include "MainActivityBinding.h"
 
 using namespace org::eclipse::cyclonedds;
-
 
 class Publisher {
     dds::pub::DataWriter<S2E::Video> m_data_writer;
@@ -26,9 +24,9 @@ class Publisher {
     GMainLoop *m_main_loop;
     GMainContext *m_context;
     std::thread* m_thread;
-    MainActivityBinding m_main_activity_binding;
+    std::unique_ptr<MainActivityBinding> m_main_activity_binding;
 public:
-    Publisher(const dds::domain::DomainParticipant& domain_participant, JavaVM* java_vm, jobject main_activity);
+    Publisher(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding);
     virtual ~Publisher();
     GstElement *video_sink();
 };
