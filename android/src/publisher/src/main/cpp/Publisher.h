@@ -2,6 +2,7 @@
 #define VODA_PUBLISHER_H
 
 #include <memory>
+#include <thread>
 #include <gst/gst.h>
 #include <dds/dds.hpp>
 #include "VideoDDS.hpp"
@@ -14,7 +15,7 @@ class Publisher {
     GstElement *m_pipeline;
     GMainLoop *m_main_loop;
     GMainContext *m_context;
-    std::thread* m_thread;
+    std::thread m_thread;
     std::unique_ptr<MainActivityBinding> m_main_activity_binding;
 public:
     Publisher(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding);

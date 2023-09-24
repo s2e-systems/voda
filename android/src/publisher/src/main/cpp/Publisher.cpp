@@ -1,6 +1,5 @@
 #include "Publisher.h"
 
-#include <thread>
 #include <gst/video/video.h>
 #include <gst/app/gstappsink.h>
 
@@ -136,12 +135,12 @@ Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, s
     gst_object_unref(bus);
 
     m_main_loop = g_main_loop_new(m_context, FALSE);
-    m_thread = new std::thread(thread_function, m_pipeline, m_main_loop, m_context);
+    m_thread = std::thread(thread_function, m_pipeline, m_main_loop, m_context);
 }
 
 Publisher::~Publisher() {
     g_main_loop_quit((GMainLoop *) m_main_loop);
-    m_thread->join();
+    m_thread.join();
 }
 
 GstElement *Publisher::video_sink() {
