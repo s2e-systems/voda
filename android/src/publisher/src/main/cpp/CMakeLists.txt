@@ -121,7 +121,6 @@ target_include_directories(gstreamer_android PUBLIC
 # ##  App  ###
 add_library(android_publisher SHARED
         publisher_binding.cpp
-        MainActivityBinding.cpp
         Publisher.cpp
         VideoDDS.cpp
         VideoDDS.hpp
