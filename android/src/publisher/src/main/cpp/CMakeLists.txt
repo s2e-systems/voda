@@ -10,7 +10,6 @@ if(NOT DEFINED ENV{CycloneDDS_ROOT_ANDROID})
 endif()
 set(CycloneDDS_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS)
 set(CycloneDDS-CXX_DIR $ENV{CycloneDDS_ROOT_ANDROID}/${ANDROID_ABI}/lib/cmake/CycloneDDS-CXX)
-
 find_package(CycloneDDS-CXX REQUIRED)
 
 # On a Windows host the _idlcxx_shared_lib cycloneddsidlcxx can not be found since
@@ -118,7 +117,6 @@ target_include_directories(gstreamer_android PUBLIC
         ${gstreamer_path}/lib/glib-2.0/include
 )
 
-# ##  App  ###
 add_library(android_publisher SHARED
         publisher_binding.cpp
         surface_holder_binding.cpp

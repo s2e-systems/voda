@@ -104,9 +104,11 @@ target_include_directories(gstreamer_android PUBLIC
         ${gstreamer_path}/lib/glib-2.0/include
 )
 
-# ##  App  ###
 add_library(android_subscriber SHARED
-        native-lib.cpp
+#        native-lib.cpp
+        surface_holder_binding.cpp
+        subscriber_binding.cpp
+        Subscriber.cpp
         VideoDDS.cpp
         VideoDDS.hpp
 )

@@ -15,7 +15,7 @@ android {
         }
     }
     buildFeatures {
-       viewBinding = true
+        viewBinding = true
     }
     namespace 'com.s2e_systems.publisher'
     buildDir = new File(rootProject.projectDir, ".build-gradle/" + project.name)

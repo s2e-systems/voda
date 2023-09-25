@@ -6,9 +6,7 @@ import android.app.Activity;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import org.freedesktop.gstreamer.GStreamer;
-import com.s2e_systems.publisher.databinding.ActivityMainBinding;
-
-
+import com.s2e_systems.subscriber.databinding.ActivityMainBinding;
 
 class SurfaceHolderCallback implements SurfaceHolder.Callback {
     final long video_sink;
@@ -34,14 +32,14 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
 
 public class MainActivity extends Activity {
 
-    private native long nativePublisherInit();
-    private native void nativePublisherFinalize();
+    private native long nativeSubscriberInit();
+    private native void nativeSubscriberFinalize();
 
     private ActivityMainBinding binding;
 
     static {
-         System.loadLibrary("gstreamer_android");
-         System.loadLibrary("android_publisher");
+        System.loadLibrary("gstreamer_android");
+        System.loadLibrary("android_subscriber");
     }
 
     @Override
@@ -52,16 +50,16 @@ public class MainActivity extends Activity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        setMessage("Publisher");
+        setMessage("Subscriber");
 
         try {
             GStreamer.init(this);
         } catch (Exception e) {
             setMessage("GStreamer init failed");
         }
-        long video_sink = nativePublisherInit();
+        long video_sink = nativeSubscriberInit();
         if (video_sink == 0) {
-            setMessage("Native publisher init failed");
+            setMessage("Native subscriber init failed");
             return;
         }
         SurfaceHolderCallback surfaceHolderCallback = new SurfaceHolderCallback(video_sink);
@@ -69,7 +67,7 @@ public class MainActivity extends Activity {
     }
 
     protected void onDestroy() {
-        nativePublisherFinalize();
+        nativeSubscriberFinalize();
         super.onDestroy();
     }
 
