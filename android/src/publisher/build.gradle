@@ -1,6 +1,20 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
 plugins {
     id 'com.android.application'
 }
+
+tasks.register('configure_gstreamer_java', Copy) {
+    from "${System.env.GSTREAMER_1_0_ROOT_ANDROID}/x86/share/gst-android/ndk-build/"
+    include 'GStreamer.java'
+    include 'androidmedia/GstAhcCallback.java'
+    include 'androidmedia/GstAhsCallback.java'
+    include 'androidmedia/GstAmcOnFrameAvailableListener.java'
+    into layout.buildDirectory.dir('org/freedesktop/gstreamer')
+    filter(ReplaceTokens, tokens: [INCLUDE_CA_CERTIFICATES: '//', INCLUDE_FONTS: '//', INCLUDE_COPY_FILE: '//'])
+}
+preBuild.dependsOn configure_gstreamer_java
+
 android {
     // Determines the version of Android SDK Platform
     compileSdk 33
@@ -17,6 +31,7 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    sourceSets.main.java.srcDirs += layout.buildDirectory
     namespace 'com.s2e_systems.publisher'
     buildDir = new File(rootProject.projectDir, ".build-gradle/" + project.name)
 }

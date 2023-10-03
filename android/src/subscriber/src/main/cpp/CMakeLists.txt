@@ -105,7 +105,6 @@ target_include_directories(gstreamer_android PUBLIC
 )
 
 add_library(android_subscriber SHARED
-#        native-lib.cpp
         surface_holder_binding.cpp
         subscriber_binding.cpp
         Subscriber.cpp

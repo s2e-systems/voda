@@ -37,7 +37,6 @@ endif()
 set(gstreamer_path $ENV{GSTREAMER_1_0_ROOT_ANDROID}/${gstreamer_abi_directory_name})
 
 set(PLUGINS_DECLARATION "
-    // ahcsrc:
     GST_PLUGIN_STATIC_DECLARE(androidmedia);
     GST_PLUGIN_STATIC_DECLARE(app);
     GST_PLUGIN_STATIC_DECLARE(autodetect);
