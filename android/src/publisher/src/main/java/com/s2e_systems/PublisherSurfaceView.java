@@ -1,4 +1,4 @@
-package gstreamer;
+package com.s2e_systems;
 
 import android.content.Context;
 import android.util.AttributeSet;
@@ -6,22 +6,20 @@ import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 
-// A simple SurfaceView whose width and height can be set from the outside
-public class GStreamerSurfaceView extends SurfaceView {
+public class PublisherSurfaceView extends SurfaceView {
     public int media_width = 320;
     public int media_height = 240;
 
-    // Mandatory constructors, they do not do much
-    public GStreamerSurfaceView(Context context, AttributeSet attrs,
-            int defStyle) {
+    public PublisherSurfaceView(Context context, AttributeSet attrs,
+                                int defStyle) {
         super(context, attrs, defStyle);
     }
 
-    public GStreamerSurfaceView(Context context, AttributeSet attrs) {
+    public PublisherSurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public GStreamerSurfaceView (Context context) {
+    public PublisherSurfaceView(Context context) {
         super(context);
     }
 
@@ -30,7 +28,8 @@ public class GStreamerSurfaceView extends SurfaceView {
     // we are given the freedom to do so.
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width = 0, height = 0;
+        int width = 0;
+        int height = 0;
         int wmode = View.MeasureSpec.getMode(widthMeasureSpec);
         int hmode = View.MeasureSpec.getMode(heightMeasureSpec);
         int wsize = View.MeasureSpec.getSize(widthMeasureSpec);

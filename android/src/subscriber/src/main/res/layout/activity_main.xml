@@ -12,7 +12,7 @@
         android:layout_marginBottom="16dip"
         android:gravity="center_horizontal" />
 
-    <gstreamer.GStreamerSurfaceView
+    <com.s2e_systems.SubscriberSurfaceView
         android:id="@+id/surface_video"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
