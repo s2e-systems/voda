@@ -144,15 +144,6 @@ Subscriber::Subscriber(const dds::domain::DomainParticipant& domain_participant,
                  nullptr
     );
 
-    //    auto sink_caps = gst_caps_new_simple("video/x-h264",
-    //                                         "stream-format", G_TYPE_STRING, "byte-stream",
-    //                                        "profile", G_TYPE_STRING, "constrained-baseline",
-    //                                         "level", G_TYPE_STRING, "2",
-    //                                         nullptr
-    //    );
-    //    GstElement* caps_filter = gst_bin_get_by_name(GST_BIN(data->pipeline), "caps_filter");
-    //    g_object_set(caps_filter, "caps", sink_caps, nullptr);
-
     // Set the pipeline to READY to receive a video_sink
     gst_element_set_state(m_pipeline, GST_STATE_READY);
     m_context = g_main_context_new();

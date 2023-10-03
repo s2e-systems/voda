@@ -23,7 +23,7 @@
 
 static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userData)
 {
-	auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video>*>(userData);
+	auto dataWriter = reinterpret_cast<dds::pub::DataWriter<S2E::Video>* >(userData);
 	if (dataWriter == nullptr || dataWriter->is_nil())
 	{
 		return GST_FLOW_ERROR;
@@ -37,21 +37,19 @@ static GstFlowReturn pullSampleAndSendViaDDS(GstAppSink* appSink, gpointer userD
 
 	// Pull a sample from the GStreamer pipeline
 	auto sample = gst_app_sink_pull_sample(appSink);
-	if (sample != nullptr)
+	if(sample != nullptr)
 	{
 		auto sampleBuffer = gst_sample_get_buffer(sample);
-		if (sampleBuffer != nullptr)
+		if(sampleBuffer != nullptr)
 		{
 			GstMapInfo mapInfo;
 			gst_buffer_map(sampleBuffer, &mapInfo, GST_MAP_READ);
 
 			const auto byteCount = int(mapInfo.size);
-			const auto rawData = static_cast<uint8_t*>(mapInfo.data);
-			const dds::core::ByteSeq frame{ rawData, rawData + byteCount };
-			*dataWriter << S2E::Video{ userid, frameNum, frame };
+			const auto rawData = static_cast<uint8_t* >(mapInfo.data);
+			const dds::core::ByteSeq frame{rawData, rawData + byteCount};
+			*dataWriter << S2E::Video{userid, frameNum, frame};
 			gst_buffer_unmap(sampleBuffer, &mapInfo);
-
-			std::cout << "sent frame number " << frameNum << std::endl;
 		}
 		gst_sample_unref(sample);
 	}
@@ -75,95 +73,6 @@ VideoDDSpublisher::~VideoDDSpublisher()
 	g_object_set(ddsAppSink, "emit-signals", false, nullptr);
 }
 
-void identity_handoff(GstElement* object, GstBuffer* buffer, gpointer user_data)
-{
-	static int previous_pts = -1;
-	static int previous_dts = -1;
-	static int previous_time = -1;
-
-	std::cout << "identity_handoff " << GST_ELEMENT_NAME(object) << ": ";
-	if (GST_BUFFER_PTS_IS_VALID(buffer))
-	{
-		const int pts = GST_BUFFER_DTS(buffer) / 1000000;
-		std::cout << "pts: " << pts << "ms ";
-		std::cout << "pts_diff: " << pts - previous_pts << "ms ";
-		previous_pts = pts;
-	}
-	if (GST_BUFFER_DTS_IS_VALID(buffer))
-	{
-		const int dts = GST_BUFFER_DTS(buffer) / 1000000;
-		std::cout << "dts: " << dts << "ms ";
-		std::cout << "dts_diff: " << dts - previous_dts << "ms ";
-		previous_dts = dts;
-	}
-	if (GST_BUFFER_DURATION_IS_VALID(buffer))
-	{
-		const int duration = GST_BUFFER_DURATION(buffer) / 1000000;
-		std::cout << "duration: " << duration << "ms ";
-	}
-
-	auto pipeline_element = gst_element_get_parent(object);
-	if (!GST_IS_PIPELINE(pipeline_element))
-	{
-		pipeline_element = gst_element_get_parent(pipeline_element);
-	}
-	const auto pipeline = GST_PIPELINE_CAST(pipeline_element);
-
-	const auto time = gst_clock_get_time(gst_pipeline_get_clock(pipeline)) / 1000000;
-	const auto time_diff = time - previous_time;
-	const auto fps = time_diff > 0 ? 1000 / time_diff : 0;
-	std::cout << "time: " << time << "ms ";
-	std::cout << "time_diff: " << time_diff << "ms " << "fps: " << fps;
-	previous_time = time;
-
-	std::cout << std::endl;
-}
-
-
-void identity_handoff2(GstElement* object, GstBuffer* buffer, gpointer user_data)
-{
-	static int previous_pts = -1;
-	static int previous_dts = -1;
-	static int previous_time = -1;
-
-	std::cout << "identity_handoff " << GST_ELEMENT_NAME(object) << ": ";
-	if (GST_BUFFER_PTS_IS_VALID(buffer))
-	{
-		const int pts = GST_BUFFER_DTS(buffer) / 1000000;
-		std::cout << "pts: " << pts << "ms ";
-		std::cout << "pts_diff: " << pts - previous_pts << "ms ";
-		previous_pts = pts;
-	}
-	if (GST_BUFFER_DTS_IS_VALID(buffer))
-	{
-		const int dts = GST_BUFFER_DTS(buffer) / 1000000;
-		std::cout << "dts: " << dts << "ms ";
-		std::cout << "dts_diff: " << dts - previous_dts << "ms ";
-		previous_dts = dts;
-	}
-	if (GST_BUFFER_DURATION_IS_VALID(buffer))
-	{
-		const int duration = GST_BUFFER_DURATION(buffer) / 1000000;
-		std::cout << "duration: " << duration << "ms ";
-	}
-
-	auto pipeline_element = gst_element_get_parent(object);
-	if (!GST_IS_PIPELINE(pipeline_element))
-	{
-		pipeline_element = gst_element_get_parent(pipeline_element);
-	}
-	const auto pipeline = GST_PIPELINE_CAST(pipeline_element);
-
-	const auto time = gst_clock_get_time(gst_pipeline_get_clock(pipeline)) / 1000000;
-	const auto time_diff = time - previous_time;
-	const auto fps = time_diff > 0 ? 1000 / time_diff : 0;
-	std::cout << "time: " << time << "ms ";
-	std::cout << "time_diff: " << time_diff << "ms " << "fps: " << fps;
-	previous_time = time;
-
-	std::cout << std::endl;
-}
-
 VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWriter, bool useTestSrc, bool useOmx, bool useFixedCaps)
 	: m_dataWriter(dataWriter)
 {
@@ -183,78 +92,67 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	}
 	sourceCandidates.push_back("videotestsrc");
 
-	ElementSelection sourceSelection{ sourceCandidates, "source" };
+	ElementSelection sourceSelection{sourceCandidates, "source"};
 
 	gst_element_set_state(sourceSelection.element(), GST_STATE_READY);
 	gst_element_get_state(sourceSelection.element(), nullptr /*state*/, nullptr /*pending*/, GST_CLOCK_TIME_NONE);
 	const auto caps = gst_pad_query_caps(gst_element_get_static_pad(sourceSelection.element(), "src"), nullptr);
 
-	GstCaps* capsFilter = nullptr;
+	GstCaps *capsFilter = nullptr;
 
 	if (useFixedCaps)
 	{
 		capsFilter = gst_caps_new_simple("video/x-raw",
-			"width", G_TYPE_INT, 640,
-			"height", G_TYPE_INT, 480,
-			"framerate", GST_TYPE_FRACTION, 30, 1,
-			nullptr);
+										 "width", G_TYPE_INT, 640,
+										 "height", G_TYPE_INT, 480,
+										 "framerate", GST_TYPE_FRACTION, 30, 1,
+										 nullptr);
 	}
-	else if (useTestSrc || sourceSelection.elementName() == "videotestsrc")
+	else
+	if (useTestSrc || sourceSelection.elementName() == "videotestsrc")
 	{
 		capsFilter = gst_caps_new_simple("video/x-raw",
-			"format", G_TYPE_STRING, "I420",
-			"width", G_TYPE_INT, 640,
-			"height", G_TYPE_INT, 480,
-			"framerate", GST_TYPE_FRACTION, 30, 1,
-			nullptr);
+										 "format", G_TYPE_STRING, "I420",
+										 "width", G_TYPE_INT, 640,
+										 "height", G_TYPE_INT, 480,
+										 "framerate", GST_TYPE_FRACTION, 30, 1,
+										 nullptr);
 		g_object_set(sourceSelection.element(), "horizontal-speed", 5, nullptr);
 	}
 	else
 	{
-		CapabilitySelection capsSelection{ caps };
+		CapabilitySelection capsSelection{caps};
 		const auto framerate = capsSelection.highestRawFrameRate();
 		capsFilter = capsSelection.highestRawArea(framerate);
-
-		const auto selected_caps_structure = gst_caps_get_structure(capsFilter, 0);
-		const auto fieldtype = gst_structure_get_field_type(selected_caps_structure, "framerate");
-
-		const auto value = gst_structure_get_value(selected_caps_structure, "framerate");
-		volatile auto denom = gst_value_get_fraction_denominator(value);
-		volatile auto num = gst_value_get_fraction_numerator(value);
 	}
-
-	g_object_set(sourceSelection.element(), "do-timestamp", true, nullptr);
 
 	auto sourceBin = GST_BIN_CAST(gst_bin_new("sourceBin"));
 	gst_bin_add(sourceBin, sourceSelection.element());
 	auto filter = gst_element_factory_make("capsfilter", nullptr);
 	g_object_set(filter, "caps", capsFilter, nullptr);
 	gst_bin_add(sourceBin, filter);
-	volatile auto ret1 = gst_element_link(sourceSelection.element(), filter);
+	gst_element_link(sourceSelection.element(), filter);
 	auto converter = gst_element_factory_make("videoconvert", nullptr);
 	gst_bin_add(sourceBin, converter);
-	volatile auto ret2 = gst_element_link(filter, converter);
+	gst_element_link(filter, converter);
 
 	auto padLastSource = gst_element_get_static_pad(converter, "src");
 	gst_element_add_pad(GST_ELEMENT_CAST(sourceBin), gst_ghost_pad_new("src", padLastSource));
 	gst_object_unref(GST_OBJECT(padLastSource));
+
 
 	//////////////
 	// DDS
 
 	auto encoderBin = GST_BIN_CAST(gst_bin_new("encoderBin"));
 
-	auto ddsAppSink = gst_element_factory_make("appsink", "ddsAppSink");
-
-	const auto identity2 = gst_element_factory_make("identity", "identity2");
-	g_signal_connect(identity2, "handoff", G_CALLBACK(identity_handoff2), nullptr);
-
+	auto ddsAppSink  = gst_element_factory_make("appsink", "ddsAppSink");
 	gst_bin_add(encoderBin, ddsAppSink);
-	gst_bin_add(encoderBin, identity2);
 	auto ddsSinkCaps = gst_caps_new_simple("video/x-h264",
 		"stream-format", G_TYPE_STRING, "byte-stream",
 		"alignment", G_TYPE_STRING, "au",
-		nullptr);
+		nullptr
+	);
 
 	g_object_set(ddsAppSink,
 		"emit-signals", true,
@@ -262,7 +160,8 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 		"max-buffers", 1,
 		"drop", false,
 		"sync", false,
-		nullptr);
+		nullptr
+	);
 
 	// Encoder
 
@@ -273,12 +172,11 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	}
 	else
 	{
-		// factory = gst_element_factory_find("x264enc");
-		factory = gst_element_factory_find("openh264enc");
+		factory = gst_element_factory_find("x264enc");
 	}
 	if (factory == nullptr)
 	{
-		throw std::runtime_error{ "No existing encoder found" };
+		throw std::runtime_error{"No existing encoder found"};
 	}
 	auto encoder = gst_element_factory_create(factory, nullptr);
 	const std::string encoderName = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(gst_element_get_factory(encoder)));
@@ -290,18 +188,20 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	if (encoderName == "avenc_h264_omx")
 	{
 		g_object_set(encoder,
-			"bitrate", gint64(kilobitrate * 1000), // set bitrate (in bits/s)
-			"gop-size", gint(keyframedistance),	// set the group of picture (GOP) size
-			nullptr);
+			"bitrate", gint64(kilobitrate * 1000), //set bitrate (in bits/s)
+			"gop-size", gint(keyframedistance),	//set the group of picture (GOP) size
+			nullptr
+		);
 		// The avenc_h264_omx does not send the PPS/SPS with the IDR frames
 		// the parser will do so
 		auto parser = gst_element_factory_make("h264parse", nullptr);
 		g_object_set(parser, "config-interval", gint(-1), nullptr);
 		gst_bin_add(encoderBin, parser);
 		gst_element_link(encoder, parser);
-		gst_element_link(parser, identity2);
+		gst_element_link(parser, ddsAppSink);
 	}
-	else if (encoderName == "x264enc")
+	else
+	if (encoderName == "x264enc")
 	{
 		g_object_set(encoder,
 			"bitrate", guint(kilobitrate),			 // Bitrate in kbit/sec
@@ -313,42 +213,42 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 			"speed-preset", 1, // Preset name for speed/quality tradeoff options
 			"trellis", gboolean(false),
 			"aud", gboolean(false), // Use AU (Access Unit) delimiter
-			nullptr);
-		gst_element_link(encoder, identity2);
-	}
-	else if (encoderName == "openh264enc")
-	{
-		gst_element_link(encoder, identity2);
+			nullptr
+		);
+		gst_element_link(encoder, ddsAppSink);
 	}
 	else
 	{
 		throw std::runtime_error("Encoder not valid");
 	}
 
-	gst_element_link(identity2, ddsAppSink);
-
 	const auto padFirstEncoder = gst_element_get_static_pad(encoder, "sink");
 	gst_element_add_pad(GST_ELEMENT_CAST(encoderBin), gst_ghost_pad_new("sink", padFirstEncoder));
 	gst_object_unref(GST_OBJECT(padFirstEncoder));
 
 	g_signal_connect(ddsAppSink, "new-sample", G_CALLBACK(pullSampleAndSendViaDDS),
-		reinterpret_cast<gpointer>(&m_dataWriter));
+					 reinterpret_cast<gpointer>(&m_dataWriter));
 
 	///////////
 	// Display
 
 	auto displayBin = GST_BIN_CAST(gst_bin_new("displayBin"));
 	auto displayConverter = gst_element_factory_make("videoconvert", nullptr);
-	auto imageSink = gst_element_factory_make("glimagesink", "displayAppSink");
+	auto appSink = gst_element_factory_make("glimagesink", "displayAppSink");
 	gst_bin_add(displayBin, displayConverter);
-	gst_bin_add(displayBin, imageSink);
+	gst_bin_add(displayBin, appSink);
 	auto displaySinkCaps = gst_caps_new_simple("video/x-raw",
 		"format", G_TYPE_STRING, "RGBA",
-		nullptr);
-	g_object_set(imageSink,
+		nullptr
+	);
+	g_object_set(appSink,
+		// "caps", displaySinkCaps,
+		// "max-buffers", 1,
+		// "drop", true,
 		"sync", false,
-		nullptr);
-	gst_element_link(displayConverter, imageSink);
+		nullptr
+	);
+	gst_element_link(displayConverter, appSink);
 
 	const auto padFirstDisplay = gst_element_get_static_pad(displayConverter, "sink");
 	gst_element_add_pad(GST_ELEMENT_CAST(displayBin), gst_ghost_pad_new("sink", padFirstDisplay));
@@ -363,19 +263,6 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	const auto queue0 = gst_element_factory_make("queue", nullptr);
 	const auto queue1 = gst_element_factory_make("queue", nullptr);
 
-	g_object_set(queue0,
-		"leaky", 0,
-		"max-size-buffers", 1,
-		nullptr);
-	g_object_set(queue1,
-		"leaky", 0,
-		"max-size-buffers", 1,
-		nullptr);
-
-	const auto identity = gst_element_factory_make("identity", "identity1");
-	gst_bin_add(GST_BIN_CAST(m_pipeline), identity);
-	g_signal_connect(identity, "handoff", G_CALLBACK(identity_handoff), nullptr);
-
 	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(sourceBin));
 	gst_bin_add(GST_BIN_CAST(m_pipeline), tee);
 	gst_bin_add(GST_BIN_CAST(m_pipeline), queue0);
@@ -383,19 +270,16 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(encoderBin));
 	gst_bin_add(GST_BIN_CAST(m_pipeline), GST_ELEMENT_CAST(displayBin));
 
-	volatile auto ret7 = gst_element_link(GST_ELEMENT_CAST(sourceBin), identity);
-	volatile auto ret8 = gst_element_link(identity, tee);
-	volatile auto ret3 = gst_element_link(queue0, GST_ELEMENT_CAST(encoderBin));
-	volatile auto ret4 = gst_element_link(queue1, GST_ELEMENT_CAST(displayBin));
-	volatile auto ret5 = gst_element_link_pads(tee, "src_0", queue0, "sink");
-	volatile auto ret6 = gst_element_link_pads(tee, "src_1", queue1, "sink");
+	auto boolret = gst_element_link(GST_ELEMENT_CAST(sourceBin), tee);
+	boolret &= gst_element_link(queue0, GST_ELEMENT_CAST(encoderBin));
+	boolret &= gst_element_link(queue1, GST_ELEMENT_CAST(displayBin));
+	boolret &= gst_element_link_pads(tee, "src_0", queue0, "sink");
+	boolret &= gst_element_link_pads(tee, "src_1", queue1, "sink");
 
-	// volatile auto ret3 = gst_element_link(identity, GST_ELEMENT_CAST(displayBin));
-
-	// if (boolret != gboolean(true))
-	// {
-	// 	throw std::runtime_error("Linking pipeline failed");
-	// }
+	if (boolret != gboolean(true))
+	{
+		throw std::runtime_error("Linking pipeline failed");
+	}
 
 	auto pipelineStartSuccess = gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
 	if (pipelineStartSuccess == GST_STATE_CHANGE_FAILURE)
@@ -403,6 +287,7 @@ VideoDDSpublisher::VideoDDSpublisher(dds::pub::DataWriter<S2E::Video>& dataWrite
 		throw std::runtime_error("Linking pipeline failed");
 	}
 }
+
 
 GstAppSink* VideoDDSpublisher::appsink()
 {
