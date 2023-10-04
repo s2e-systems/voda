@@ -1,8 +1,9 @@
-build-*
-projects/VideoDDS.pro.user
-*.orig
-*.lnk
-projects/CMakeLists.txt.user
-*.autosave
-projects/build/
-projects/.vscode/
+.vscode
+CMakeUserPresets.json
+build
+android/.gradle
+android/.idea
+android/.build-ndk
+android/.build-gradle
+local.properties
+.editorconfig
