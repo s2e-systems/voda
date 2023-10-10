@@ -16,3 +16,5 @@ jobs:
         run: cmake -B $GITHUB_WORKSPACE/../build -S $GITHUB_WORKSPACE
       - name: Build
         run: cmake --build $GITHUB_WORKSPACE/../build
+      - name: Build Android
+        run: ./android/gradlew.bat --project-dir ./android
