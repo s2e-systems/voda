@@ -17,4 +17,4 @@ jobs:
       - name: Build
         run: cmake --build ../build
       - name: Build Android
-        run: ./android/gradlew --project-dir android
+        run: ./android/gradlew --project-dir android build
