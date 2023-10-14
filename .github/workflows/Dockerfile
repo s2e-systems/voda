@@ -3,9 +3,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y xz-utils curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /home/gstreamer-1.0-android-universal
-RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar -x
-#ADD https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz .
-#RUN mkdir gstreamer-1.0-android-universal && tar -xf gstreamer-1.0-android-universal-1.20.5.tar.xz --directory gstreamer-1.0-android-universal && rm gstreamer-1.0-android-universal-1.20.5.tar.xz
+RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar --extract --xz
 WORKDIR /home
 # RUN apt-get update && apt-get install -y build-essential cmake git google-android-ndk-installer
 
