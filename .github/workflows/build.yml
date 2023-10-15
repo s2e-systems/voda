@@ -3,37 +3,28 @@ name: Test Build
 on: [push]
 
 jobs:
-  create_docker_image_or_not:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-    outputs:
-      docker_image: ${{ steps.filter.outputs.docker_image }}
-    steps:
-    - uses: actions/checkout@v3
-    - uses: dorny/paths-filter@v2
-      id: filter
-      with:
-        filters: |
-          docker_image:
-            - 'DOES_NOT_EXISTS/.github/workflows/Dockerfile'
   create_docker_image:
-    needs: create_docker_image_or_not
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            docker_image:
+              - 'DOES_NOT_EXISTS/.github/workflows/Dockerfile'
       - name: Build Docker image
-        if: ${{ needs.create_docker_image_or_not.outputs.docker_image == 'true' }}
+        if: ${{ steps.filter.outputs.docker_image == 'true' }}
         run: docker build . --file .github/workflows/Dockerfile --tag ghcr.io/${{ github.repository }}:${{ github.run_number }}
       - name: Login to GitHub Container Registry
-        if: ${{ needs.create_docker_image_or_not.outputs.docker_image == 'true' }}
+        if: ${{ steps.filter.outputs.docker_image == 'true' }}
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.github_token }}
       - name: Push Docker Image
-        if: ${{ needs.create_docker_image_or_not.outputs.docker_image == 'true' }}
+        if: ${{ steps.filter.outputs.docker_image == 'true' }}
         run: |
           docker push ghcr.io/${{ github.repository }}:${{ github.run_number }}
           docker tag ghcr.io/${{ github.repository }}:${{ github.run_number }} ghcr.io/${{ github.repository }}:latest
