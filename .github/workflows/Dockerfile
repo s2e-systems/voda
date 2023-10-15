@@ -61,12 +61,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     build-essential cmake ninja-build openjdk-19-jre-headless xz-utils curl libgstreamer-plugins-base1.0-dev \
     && rm -rf /var/lib/apt/lists/*
-WORKDIR /home/gstreamer-1.0-android-universal
+WORKDIR /usr/local/gstreamer-1.0-android-universal
 RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar --extract --xz
-COPY --from=CycloneDdsAndroidBuilder /android_sdk /android_sdk
-COPY --from=CycloneDdsBuilder /home/cyclonedds-install /usr/local/
-COPY --from=CycloneDdsAndroidBuilder /home/cyclonedds-install /usr/local/
 WORKDIR /home/root
+COPY --from=CycloneDdsAndroidBuilder /android_sdk /android_sdk
+COPY --from=CycloneDdsBuilder /usr/local/cyclonedds-install /usr/local/
+COPY --from=CycloneDdsAndroidBuilder /usr/local/cyclonedds-install /usr/local/
 ENV ANDROID_HOME=/android_sdk
 ENV CycloneDDS_ROOT_ANDROID=/usr/local/android
 ENV GSTREAMER_1_0_ROOT_ANDROID=/usr/local/gstreamer-1.0-android-universal
