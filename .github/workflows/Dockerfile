@@ -3,11 +3,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /home
 RUN apt-get update && apt-get install -y build-essential cmake git && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cyclonedds.git \
-    && cmake -S cyclonedds -B cyclonedds-build --install-prefix /home/cyclonedds-install \
+    && cmake -S cyclonedds -B cyclonedds-build --install-prefix /usr/local/cyclonedds \
     && cmake --build cyclonedds-build --parallel 5 --target install \
     && rm -r cyclonedds-build cyclonedds
 RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cyclonedds-cxx.git \
-    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build -DCycloneDDS_DIR=/home/cyclonedds-install/lib/cmake/CycloneDDS --install-prefix /home/cyclonedds-install \
+    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build -DCycloneDDS_DIR=/usr/local/cyclonedds/lib/cmake/CycloneDDS --install-prefix /usr/local/cyclonedds \
     && cmake --build cyclonedds-cxx-build --parallel 5 --target install \
     && rm -r cyclonedds-cxx-build cyclonedds-cxx
 
@@ -26,32 +26,32 @@ ENV ANDROID_HOME=/android_sdk
 WORKDIR /home
 RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cyclonedds.git \
     && cmake -S cyclonedds -B cyclonedds-build-android/x86_64 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86_64 -DENABLE_SECURITY=Off -DBUILD_IDLC=On -DBUILD_SHARED_LIBS=Off \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/x86_64 \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/x86_64 \
     && cmake --build cyclonedds-build-android/x86_64 --parallel 5 --target install \
     && cmake -S cyclonedds -B cyclonedds-build-android/x86 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86 -DENABLE_SECURITY=Off -DBUILD_IDLC=On -DBUILD_SHARED_LIBS=Off \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/x86 \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/x86 \
     && cmake --build cyclonedds-build-android/x86 --parallel 5 --target install \
     && cmake -S cyclonedds -B cyclonedds-build-android/arm64-v8a -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=arm64-v8a -DENABLE_SECURITY=Off -DBUILD_IDLC=On -DBUILD_SHARED_LIBS=Off \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/arm64-v8a \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/arm64-v8a \
     && cmake --build cyclonedds-build-android/arm64-v8a --parallel 5 --target install \
     && cmake -S cyclonedds -B cyclonedds-build-android/armeabi-v7a -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=armeabi-v7a -DENABLE_SECURITY=Off -DBUILD_IDLC=On -DBUILD_SHARED_LIBS=Off \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/armeabi-v7a \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/armeabi-v7a \
     && cmake --build cyclonedds-build-android/armeabi-v7a --parallel 5 --target install \
     && rm -r cyclonedds-build-android cyclonedds
 
 
 RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cyclonedds-cxx.git \
-    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/x86_64 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86_64 -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/home/cyclonedds-install/android/x86_64/lib/cmake/CycloneDDS \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/x86_64 \
+    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/x86_64 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86_64 -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/usr/local/cyclonedds/android/x86_64/lib/cmake/CycloneDDS \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/x86_64 \
     && cmake --build cyclonedds-cxx-build-android/x86_64 --parallel 5 --target install \
-    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/x86 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86 -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/home/cyclonedds-install/android/x86/lib/cmake/CycloneDDS \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/x86 \
+    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/x86 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86 -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/usr/local/cyclonedds/android/x86/lib/cmake/CycloneDDS \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/x86 \
     && cmake --build cyclonedds-cxx-build-android/x86 --parallel 5 --target install \
-    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/arm64-v8a -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=arm64-v8a -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/home/cyclonedds-install/android/arm64-v8a/lib/cmake/CycloneDDS \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/arm64-v8a \
+    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/arm64-v8a -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=arm64-v8a -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/usr/local/cyclonedds/android/arm64-v8a/lib/cmake/CycloneDDS \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/arm64-v8a \
     && cmake --build cyclonedds-cxx-build-android/arm64-v8a --parallel 5 --target install \
-    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/armeabi-v7a -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=armeabi-v7a -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/home/cyclonedds-install/android/armeabi-v7a/lib/cmake/CycloneDDS \
-    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /home/cyclonedds-install/android/armeabi-v7a \
+    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/armeabi-v7a -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=armeabi-v7a -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/usr/local/cyclonedds/android/armeabi-v7a/lib/cmake/CycloneDDS \
+    --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/armeabi-v7a \
     && cmake --build cyclonedds-cxx-build-android/armeabi-v7a --parallel 5 --target install \
     && rm -r cyclonedds-cxx-build-android cyclonedds-cxx
 
@@ -65,8 +65,8 @@ WORKDIR /usr/local/gstreamer-1.0-android-universal
 RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar --extract --xz
 WORKDIR /home/root
 COPY --from=CycloneDdsAndroidBuilder /android_sdk /android_sdk
-COPY --from=CycloneDdsBuilder /usr/local/cyclonedds-install /usr/local/
-COPY --from=CycloneDdsAndroidBuilder /usr/local/cyclonedds-install /usr/local/
+COPY --from=CycloneDdsBuilder /usr/local/cyclonedds /usr/local/
+COPY --from=CycloneDdsAndroidBuilder /usr/local/cyclonedds /usr/local/
 ENV ANDROID_HOME=/android_sdk
 ENV CycloneDDS_ROOT_ANDROID=/usr/local/android
 ENV GSTREAMER_1_0_ROOT_ANDROID=/usr/local/gstreamer-1.0-android-universal
