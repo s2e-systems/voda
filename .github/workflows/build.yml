@@ -12,7 +12,7 @@ jobs:
         with:
           filters: |
             docker_image:
-              - 'DOES_NOT_EXISTS/.github/workflows/Dockerfile'
+              - '.github/workflows/Dockerfile'
       - name: Build Docker image
         if: ${{ steps.filter.outputs.docker_image == 'true' }}
         run: docker build . --file .github/workflows/Dockerfile --tag ghcr.io/${{ github.repository }}:${{ github.run_number }}
