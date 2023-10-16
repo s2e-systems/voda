@@ -18,7 +18,7 @@ class Publisher {
     std::thread m_thread;
     std::unique_ptr<MainActivityBinding> m_main_activity_binding;
 public:
-    Publisher(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding);
+    Publisher(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding, int orientation);
     virtual ~Publisher();
     GstElement *video_sink();
 };

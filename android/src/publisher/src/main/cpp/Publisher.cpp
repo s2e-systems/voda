@@ -24,7 +24,7 @@ static void state_changed_cb(GstBus *, GstMessage *gst_message, std::unique_ptr<
     // Only show messages coming from the pipeline, not its children
     if (GST_IS_PIPELINE(GST_MESSAGE_SRC(gst_message))) {
         gchar *const g_message = g_strdup_printf("State changed to %s",
-                                               gst_element_state_get_name(new_state));
+                                                 gst_element_state_get_name(new_state));
         main_activity_binding->setUiMessage(g_message);
         g_free(g_message);
     }
@@ -73,7 +73,7 @@ static void thread_function(GstElement *pipeline, GMainLoop *main_loop, GMainCon
     gst_object_unref(pipeline);
 }
 
-Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding) :
+Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding, int orientation) :
         m_data_writer{dds::pub::Publisher{domain_participant},
                       dds::topic::Topic<S2E::Video>{domain_participant, "VideoStream"},
                       [] {
@@ -93,7 +93,7 @@ Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, s
 {
     GError *error = nullptr;
     m_pipeline = gst_parse_launch(
-            "ahcsrc device=1 ! video/x-raw,format=NV21 ! videoconvert ! "
+            "ahcsrc device=1 ! video/x-raw,format=NV21 ! videoflip name=videoflip ! videoconvert ! "
             "tee name=t ! queue leaky=2 ! autovideosink  "
             "t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
             &error);
@@ -101,6 +101,11 @@ Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, s
         const std::string error_msg(std::string("Unable to build pipeline: ") + std::string(error->message));
         g_clear_error(&error);
         throw std::runtime_error(error_msg);
+    }
+
+    GstElement *videoflip = gst_bin_get_by_name(GST_BIN(m_pipeline), "videoflip");
+    if (orientation == 1) {
+        g_object_set(videoflip, "method", 3, nullptr);
     }
 
     GstBus *bus = gst_element_get_bus(m_pipeline);

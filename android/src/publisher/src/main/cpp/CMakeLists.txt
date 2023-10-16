@@ -49,6 +49,7 @@ set(PLUGINS_DECLARATION
     GST_PLUGIN_STATIC_DECLARE(opengl);
     GST_PLUGIN_STATIC_DECLARE(openh264);
     GST_PLUGIN_STATIC_DECLARE(videoconvert);
+    GST_PLUGIN_STATIC_DECLARE(videofilter);
     GST_PLUGIN_STATIC_DECLARE(videotestsrc);
     GST_PLUGIN_STATIC_DECLARE(videorate);
 ")
@@ -61,6 +62,7 @@ set(PLUGINS_REGISTRATION
     GST_PLUGIN_STATIC_REGISTER(opengl);
     GST_PLUGIN_STATIC_REGISTER(openh264);
     GST_PLUGIN_STATIC_REGISTER(videoconvert);
+    GST_PLUGIN_STATIC_REGISTER(videofilter);
     GST_PLUGIN_STATIC_REGISTER(videotestsrc);
     GST_PLUGIN_STATIC_REGISTER(videorate);
 ")
@@ -86,6 +88,7 @@ target_link_libraries(
   ${gstreamer_path}/lib/gstreamer-1.0/libgstopengl.a
   ${gstreamer_path}/lib/gstreamer-1.0/libgstopenh264.a
   ${gstreamer_path}/lib/gstreamer-1.0/libgstvideoconvert.a
+  ${gstreamer_path}/lib/gstreamer-1.0/libgstvideofilter.a
   ${gstreamer_path}/lib/gstreamer-1.0/libgstvideotestsrc.a
   ${gstreamer_path}/lib/gstreamer-1.0/libgstvideorate.a
   ${gstreamer_path}/lib/libffi.a
