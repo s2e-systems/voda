@@ -16,7 +16,7 @@ jobs:
         with:
           filters: |
             docker_image:
-              - '.github/workflows/Dockerfile'
+              - '.github/workflows/android/Dockerfile'
       - name: Build Docker image
         if: ${{ steps.filter.outputs.docker_image == 'true' }}
         run: docker build . --file .github/workflows/android/Dockerfile --tag ghcr.io/${{ github.repository }}:${{ github.run_number }}
