@@ -10,7 +10,7 @@ jobs:
     name: Create Android Docker Image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -43,6 +43,6 @@ jobs:
         username: ${{ github.ref }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build Android
         run: ./android/gradlew --project-dir android build
