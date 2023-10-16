@@ -2,7 +2,7 @@ name: Test Android Build
 
 on:
   push:
-    paths:
+    paths-ignore:
       - 'android/**'
 
 jobs:
