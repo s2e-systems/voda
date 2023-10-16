@@ -33,7 +33,7 @@ jobs:
           docker push ghcr.io/${{ github.repository }}:${{ github.run_number }}
           docker tag ghcr.io/${{ github.repository }}:${{ github.run_number }} ghcr.io/${{ github.repository }}:latest
           docker push ghcr.io/${{ github.repository }}:latest
-  build:
+  build_linux:
     name: Build Linux
     needs: create_docker_image
     runs-on: ubuntu-latest
