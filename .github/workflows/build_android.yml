@@ -2,8 +2,8 @@ name: Test Android Build
 
 on:
   push:
-    paths-ignore:
-      - 'android/**'
+    paths:
+      - 'android/*'
 
 jobs:
   create_docker_image:

@@ -3,7 +3,7 @@ name: Test Linux Build
 on:
   push:
     paths-ignore:
-      - 'android/**'
+      - 'android/*'
 
 jobs:
   create_docker_image:
