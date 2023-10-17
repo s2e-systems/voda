@@ -50,7 +50,7 @@ RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cy
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
-    build-essential cmake ninja-build openjdk-19-jre-headless xz-utils curl libgstreamer-plugins-base1.0-dev \
+    cmake ninja-build openjdk-19-jre-headless xz-utils curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/local/gstreamer-1.0-android-universal
 RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar --extract --xz
