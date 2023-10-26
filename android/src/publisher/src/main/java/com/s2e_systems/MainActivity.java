@@ -52,6 +52,13 @@ public class MainActivity extends Activity {
     public void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
+
+        try {
+            GStreamer.init(this);
+        } catch (Exception e) {
+            setMessage("GStreamer init failed");
+        }
+
         onConfigurationChanged(this.getResources().getConfiguration());
     }
 
@@ -62,11 +69,6 @@ public class MainActivity extends Activity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        try {
-            GStreamer.init(this);
-        } catch (Exception e) {
-            setMessage("GStreamer init failed");
-        }
         long video_sink = nativePublisherInit(newConfig.orientation);
         if (video_sink == 0) {
             setMessage("Native publisher init failed");

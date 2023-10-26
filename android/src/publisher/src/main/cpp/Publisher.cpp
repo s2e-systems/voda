@@ -23,10 +23,7 @@ static void state_changed_cb(GstBus *, GstMessage *gst_message, std::unique_ptr<
     gst_message_parse_state_changed(gst_message, &old_state, &new_state, &pending_state);
     // Only show messages coming from the pipeline, not its children
     if (GST_IS_PIPELINE(GST_MESSAGE_SRC(gst_message))) {
-        gchar *const g_message = g_strdup_printf("State changed to %s",
-                                                 gst_element_state_get_name(new_state));
-        main_activity_binding->setUiMessage(g_message);
-        g_free(g_message);
+        main_activity_binding->setUiMessage(std::string("State changed to ") + gst_element_state_get_name(new_state));
     }
 }
 
