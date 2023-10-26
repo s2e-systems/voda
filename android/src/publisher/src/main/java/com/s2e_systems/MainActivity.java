@@ -1,10 +1,14 @@
 package com.s2e_systems;
 
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.widget.TextView;
 import android.app.Activity;
 import android.util.Log;
 import android.view.SurfaceHolder;
+
+import androidx.annotation.NonNull;
+
 import org.freedesktop.gstreamer.GStreamer;
 import com.s2e_systems.publisher.databinding.ActivityMainBinding;
 
@@ -34,7 +38,7 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
 
 public class MainActivity extends Activity {
 
-    private native long nativePublisherInit();
+    private native long nativePublisherInit(int orientation);
     private native void nativePublisherFinalize();
 
     private ActivityMainBinding binding;
@@ -49,17 +53,23 @@ public class MainActivity extends Activity {
     {
         super.onCreate(savedInstanceState);
 
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
-
-        setMessage("Publisher");
-
         try {
             GStreamer.init(this);
         } catch (Exception e) {
             setMessage("GStreamer init failed");
         }
-        long video_sink = nativePublisherInit();
+
+        onConfigurationChanged(this.getResources().getConfiguration());
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
+        long video_sink = nativePublisherInit(newConfig.orientation);
         if (video_sink == 0) {
             setMessage("Native publisher init failed");
             return;
@@ -73,7 +83,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    // Called from native code. This sets the content of the TextView from the UI thread.
+    // Can be called native code. This sets the content of the TextView from the UI thread.
     private void setMessage(final String message) {
         final TextView tv = binding.textviewMessage;
         runOnUiThread(() -> tv.setText(message));
