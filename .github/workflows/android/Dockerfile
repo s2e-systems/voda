@@ -11,7 +11,10 @@ RUN ./bin/sdkmanager --install "build-tools;30.0.3" "ndk;25.1.8937393"
 ENV ANDROID_HOME=/android_sdk
 
 WORKDIR /home
+
 RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cyclonedds.git \
+    && cmake -S cyclonedds -B cyclonedds-build --install-prefix /usr/local/cyclonedds \
+    && cmake --build cyclonedds-build --parallel 5 --target install \
     && cmake -S cyclonedds -B cyclonedds-build-android/x86_64 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86_64 -DENABLE_SECURITY=Off -DBUILD_IDLC=On -DBUILD_SHARED_LIBS=Off \
     --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/x86_64 \
     && cmake --build cyclonedds-build-android/x86_64 --parallel 5 --target install \
@@ -26,8 +29,9 @@ RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cy
     && cmake --build cyclonedds-build-android/armeabi-v7a --parallel 5 --target install \
     && rm -r cyclonedds-build-android cyclonedds
 
-
 RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cyclonedds-cxx.git \
+    && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build -DCycloneDDS_DIR=/usr/local/cyclonedds/lib/cmake/CycloneDDS --install-prefix /usr/local/cyclonedds \
+    && cmake --build cyclonedds-cxx-build --parallel 5 --target install \
     && cmake -S cyclonedds-cxx -B cyclonedds-cxx-build-android/x86_64 -DANDROID_NATIVE_API_LEVEL=28 -DANDROID_ABI=x86_64 -DBUILD_IDLLIB=On -DBUILD_SHARED_LIBS=Off -DCycloneDDS_DIR=/usr/local/cyclonedds/android/x86_64/lib/cmake/CycloneDDS \
     --toolchain /android_sdk/ndk/25.1.8937393/build/cmake/android.toolchain.cmake --install-prefix /usr/local/cyclonedds/android/x86_64 \
     && cmake --build cyclonedds-cxx-build-android/x86_64 --parallel 5 --target install \
@@ -46,7 +50,7 @@ RUN git clone --depth 1 --branch 0.10.2 https://github.com/eclipse-cyclonedds/cy
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
-    build-essential cmake ninja-build openjdk-19-jre-headless xz-utils curl libgstreamer-plugins-base1.0-dev \
+    cmake ninja-build openjdk-19-jre-headless xz-utils curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/local/gstreamer-1.0-android-universal
 RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar --extract --xz

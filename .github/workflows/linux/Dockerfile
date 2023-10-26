@@ -17,5 +17,4 @@ RUN apt-get update && apt-get install -y \
     build-essential cmake libgstreamer-plugins-base1.0-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=CycloneDdsBuilder /usr/local/cyclonedds /usr/local/
-ENV ANDROID_HOME=/android_sdk
 WORKDIR /home/root

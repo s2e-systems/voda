@@ -2,8 +2,8 @@ name: Test Android Build
 
 on:
   push:
-    paths-ignore:
-      - 'android/**'
+    paths:
+      - 'android/*'
 
 jobs:
   create_docker_image:
@@ -22,7 +22,7 @@ jobs:
         run: docker build . --file .github/workflows/android/Dockerfile --tag ghcr.io/${{ github.repository }}:android
       - name: Login to GitHub Container Registry
         if: ${{ steps.filter.outputs.docker_image == 'true' }}
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
