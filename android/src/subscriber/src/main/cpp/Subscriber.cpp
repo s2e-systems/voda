@@ -97,7 +97,7 @@ static void thread_function(GstElement *pipeline, GMainLoop *main_loop, GMainCon
     gst_object_unref(pipeline);
 }
 
-Subscriber::Subscriber(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding) :
+Subscriber::Subscriber(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding, int orientation) :
         m_data_reader{dds::sub::Subscriber{domain_participant},
                       dds::topic::Topic<S2E::Video>{domain_participant, "VideoStream"},
                       [] {

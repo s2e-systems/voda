@@ -22,7 +22,7 @@ class Subscriber {
     VideoListener* m_video_listener;
 
 public:
-    Subscriber(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding);
+    Subscriber(const dds::domain::DomainParticipant& domain_participant, std::unique_ptr<MainActivityBinding> main_activity_binding, int orientation);
     virtual ~Subscriber();
     GstElement *video_sink();
 };

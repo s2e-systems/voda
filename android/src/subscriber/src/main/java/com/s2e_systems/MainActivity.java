@@ -1,10 +1,14 @@
 package com.s2e_systems;
 
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.widget.TextView;
 import android.app.Activity;
 import android.util.Log;
 import android.view.SurfaceHolder;
+
+import androidx.annotation.NonNull;
+
 import org.freedesktop.gstreamer.GStreamer;
 import com.s2e_systems.subscriber.databinding.ActivityMainBinding;
 
@@ -32,7 +36,7 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
 
 public class MainActivity extends Activity {
 
-    private native long nativeSubscriberInit();
+    private native long nativeSubscriberInit(int orientation);
     private native void nativeSubscriberFinalize();
 
     private ActivityMainBinding binding;
@@ -47,17 +51,23 @@ public class MainActivity extends Activity {
     {
         super.onCreate(savedInstanceState);
 
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
-
-        setMessage("Subscriber");
-
         try {
             GStreamer.init(this);
         } catch (Exception e) {
             setMessage("GStreamer init failed");
         }
-        long video_sink = nativeSubscriberInit();
+
+        onConfigurationChanged(this.getResources().getConfiguration());
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
+        long video_sink = nativeSubscriberInit(newConfig.orientation);
         if (video_sink == 0) {
             setMessage("Native subscriber init failed");
             return;
