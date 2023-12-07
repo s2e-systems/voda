@@ -21,6 +21,11 @@ android {
     defaultConfig {
         applicationId 'com.s2e_systems.subscriber'
         minSdk 28
+        externalNativeBuild {
+            cmake {
+                cppFlags '-Wl,-Bsymbolic'
+            }
+        }
     }
     externalNativeBuild {
         cmake {

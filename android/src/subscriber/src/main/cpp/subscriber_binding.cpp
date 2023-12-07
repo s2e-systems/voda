@@ -14,7 +14,7 @@ jint JNI_OnLoad(JavaVM*, void*) {
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_s2e_1systems_MainActivity_nativeSubscriberInit(JNIEnv * env, jobject thiz, int orientation) {
+Java_com_s2e_1systems_MainActivity_nativeSubscriberInit(JNIEnv * env, jobject thiz) {
 
     setenv("CYCLONEDDS_URI", R"(<CycloneDDS><Domain><General><Interfaces>
         <NetworkInterface name="eth1" presence_required="false" />
@@ -27,7 +27,7 @@ Java_com_s2e_1systems_MainActivity_nativeSubscriberInit(JNIEnv * env, jobject th
         std::unique_ptr<MainActivityBinding> main_activity_binding{
                 new MainActivityBinding{java_vm, thiz} };
         NATIVE_SUBSCRIBER = new Subscriber(dds::domain::DomainParticipant{ domain::default_id() },
-            std::move(main_activity_binding), orientation);
+            std::move(main_activity_binding));
         return reinterpret_cast<jlong>(NATIVE_SUBSCRIBER->video_sink());
     }
     catch (const dds::core::Exception& e) {

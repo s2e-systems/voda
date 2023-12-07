@@ -36,7 +36,7 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
 
 public class MainActivity extends Activity {
 
-    private native long nativeSubscriberInit(int orientation);
+    private native long nativeSubscriberInit();
     private native void nativeSubscriberFinalize();
 
     private ActivityMainBinding binding;
@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        long video_sink = nativeSubscriberInit(newConfig.orientation);
+        long video_sink = nativeSubscriberInit();
         if (video_sink == 0) {
             setMessage("Native subscriber init failed");
             return;
