@@ -48,6 +48,7 @@ set(PLUGINS_DECLARATION
     GST_PLUGIN_STATIC_DECLARE(opengl);
     GST_PLUGIN_STATIC_DECLARE(openh264);
     GST_PLUGIN_STATIC_DECLARE(videoconvert);
+    GST_PLUGIN_STATIC_DECLARE(libav);
 ")
 set(PLUGINS_REGISTRATION
     "
@@ -57,6 +58,7 @@ set(PLUGINS_REGISTRATION
     GST_PLUGIN_STATIC_REGISTER(opengl);
     GST_PLUGIN_STATIC_REGISTER(openh264);
     GST_PLUGIN_STATIC_REGISTER(videoconvert);
+    GST_PLUGIN_STATIC_REGISTER(libav);
 ")
 
 set(G_IO_MODULES_DECLARE "")
@@ -98,7 +100,16 @@ target_link_libraries(
   ${gstreamer_path}/lib/libopenh264.a
   ${gstreamer_path}/lib/liborc-0.4.a
   ${gstreamer_path}/lib/libpng16.a
-  ${gstreamer_path}/lib/libz.a)
+  ${gstreamer_path}/lib/libz.a
+  ${gstreamer_path}/lib/gstreamer-1.0/libgstlibav.a
+  ${gstreamer_path}/lib/libavutil.a
+  ${gstreamer_path}/lib/libavcodec.a
+  ${gstreamer_path}/lib/libavformat.a
+  ${gstreamer_path}/lib/libavfilter.a
+  ${gstreamer_path}/lib/libswresample.a
+  ${gstreamer_path}/lib/libgstaudio-1.0.a
+  ${gstreamer_path}/lib/libbz2.a
+)
 
 target_include_directories(
   gstreamer_android

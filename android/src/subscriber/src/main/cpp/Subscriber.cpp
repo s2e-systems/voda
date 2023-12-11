@@ -7,12 +7,12 @@
 class VideoListener: public virtual dds::sub::DataReaderListener<S2E::Video>,
                      public virtual dds::sub::NoOpDataReaderListener<S2E::Video> {
 public:
-    VideoListener(GstAppSrc* const appSrc):
+    explicit VideoListener(GstAppSrc* const appSrc):
             m_appSrc(appSrc)
     {    }
 
 private:
-    virtual void on_data_available(dds::sub::DataReader<S2E::Video>& reader)
+    void on_data_available(dds::sub::DataReader<S2E::Video>& reader) override
     {
         //Check if the GStreamer pipeline is running, by checking the state of the appsrc
         GstState appSrcState = GST_STATE_NULL;
@@ -111,7 +111,7 @@ Subscriber::Subscriber(const dds::domain::DomainParticipant& domain_participant,
         m_main_activity_binding{std::move(main_activity_binding)}
 {
     GError *error = nullptr;
-    m_pipeline = gst_parse_launch("appsrc name=app_src ! openh264dec ! videoconvert ! autovideosink",&error);
+    m_pipeline = gst_parse_launch("appsrc name=app_src ! avdec_h264 ! videoconvert ! autovideosink sync=false",&error);
     if (error) {
         const std::string error_msg(std::string("Unable to build pipeline: ") + std::string(error->message));
         g_clear_error(&error);

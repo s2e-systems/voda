@@ -1,10 +1,14 @@
 package com.s2e_systems;
 
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.widget.TextView;
 import android.app.Activity;
 import android.util.Log;
 import android.view.SurfaceHolder;
+
+import androidx.annotation.NonNull;
+
 import org.freedesktop.gstreamer.GStreamer;
 import com.s2e_systems.subscriber.databinding.ActivityMainBinding;
 
@@ -47,16 +51,22 @@ public class MainActivity extends Activity {
     {
         super.onCreate(savedInstanceState);
 
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
-
-        setMessage("Subscriber");
-
         try {
             GStreamer.init(this);
         } catch (Exception e) {
             setMessage("GStreamer init failed");
         }
+
+        onConfigurationChanged(this.getResources().getConfiguration());
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
+
         long video_sink = nativeSubscriberInit();
         if (video_sink == 0) {
             setMessage("Native subscriber init failed");

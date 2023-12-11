@@ -13,7 +13,7 @@ jint JNI_OnLoad(JavaVM *, void *) {
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_s2e_1systems_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz) {
+Java_com_s2e_1systems_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz, int orientation) {
 
     setenv("CYCLONEDDS_URI", R"(<CycloneDDS><Domain><General><Interfaces>
         <NetworkInterface name="eth1" presence_required="false" />
@@ -26,7 +26,7 @@ Java_com_s2e_1systems_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz
         std::unique_ptr<MainActivityBinding> main_activity_binding{
                 new MainActivityBinding{java_vm, thiz}};
         NATIVE_PUBLISHER = new Publisher(dds::domain::DomainParticipant{domain::default_id()},
-                                         std::move(main_activity_binding));
+                                         std::move(main_activity_binding), orientation);
         return reinterpret_cast<jlong>(NATIVE_PUBLISHER->video_sink());
     } catch (const dds::core::Exception &e) {
         __android_log_print(ANDROID_LOG_ERROR, "NativePublisher",
