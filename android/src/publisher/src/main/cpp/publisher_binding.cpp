@@ -30,7 +30,7 @@ Java_com_s2e_1systems_MainActivity_nativePublisherInit(JNIEnv *env, jobject thiz
         return reinterpret_cast<jlong>(NATIVE_PUBLISHER->video_sink());
     } catch (const dds::core::Exception &e) {
         __android_log_print(ANDROID_LOG_ERROR, "NativePublisher",
-                            "DDS initializaion failed with: %s", e.what());
+                            "DDS initialization failed with: %s", e.what());
     } catch (const std::exception &e) {
         __android_log_print(ANDROID_LOG_ERROR, "NativePublisher", "PublisherInit failed with: %s",
                             e.what());

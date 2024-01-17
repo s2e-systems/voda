@@ -90,7 +90,7 @@ Publisher::Publisher(const dds::domain::DomainParticipant& domain_participant, s
 {
     GError *error = nullptr;
     m_pipeline = gst_parse_launch(
-            "ahcsrc device=1 ! video/x-raw,format=NV21 ! videoflip name=videoflip ! videoconvert ! "
+            "ahcsrc device=0 ! video/x-raw,format=NV21 ! videoflip name=videoflip ! videoconvert ! "
             "tee name=t ! queue leaky=2 ! autovideosink  "
             "t. ! queue leaky=2 ! videoconvert ! openh264enc ! appsink name=app_sink",
             &error);
