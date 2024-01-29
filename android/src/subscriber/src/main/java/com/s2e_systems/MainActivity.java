@@ -42,7 +42,6 @@ public class MainActivity extends Activity {
     private ActivityMainBinding binding;
 
     static {
-        System.loadLibrary("gstreamer_android");
         System.loadLibrary("android_subscriber");
     }
 
