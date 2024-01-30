@@ -53,7 +53,7 @@ RUN apt-get update && apt-get install -y \
     cmake ninja-build openjdk-19-jre-headless xz-utils curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/local/gstreamer-1.0-android-universal
-RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar --extract --xz
+RUN curl https://gstreamer.freedesktop.org/pkg/android/1.22.6/gstreamer-1.0-android-universal-1.22.6.tar.xz | tar --extract --xz
 WORKDIR /home/root
 COPY --from=CycloneDdsAndroidBuilder /android_sdk /android_sdk
 COPY --from=CycloneDdsAndroidBuilder /usr/local/cyclonedds /usr/local/
