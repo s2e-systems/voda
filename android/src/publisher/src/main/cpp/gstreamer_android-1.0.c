@@ -1,12 +1,9 @@
 #include <jni.h>
 #include <gst/gst.h>
-#include <gio/gio.h>
-#include <android/log.h>
-#include <string.h>
 
-static jobject _context = NULL;
-static jobject _class_loader = NULL;
-static JavaVM *_java_vm = NULL;
+static jobject CONTEXT = NULL;
+static jobject CLASS_LOADER = NULL;
+static JavaVM *JAVA_VM = NULL;
 
 /* Declaration of static plugins */
 GST_PLUGIN_STATIC_DECLARE(androidmedia);
@@ -19,7 +16,6 @@ GST_PLUGIN_STATIC_DECLARE(videoconvertscale);
 GST_PLUGIN_STATIC_DECLARE(videofilter);
 GST_PLUGIN_STATIC_DECLARE(videotestsrc);
 GST_PLUGIN_STATIC_DECLARE(videorate);
-/* Declaration of static gio modules */
 
 /* This is called by gst_init() to register static plugins */
 void gst_init_static_plugins(void)
@@ -36,57 +32,51 @@ void gst_init_static_plugins(void)
     GST_PLUGIN_STATIC_REGISTER(videorate);
 }
 
+/* AMC plugin uses g_module_symbol() to find this symbol */
 jobject
 gst_android_get_application_context(void)
 {
-    return _context;
+    return CONTEXT;
 }
 
+/* AMC plugin uses g_module_symbol() to find this symbol */
 jobject
 gst_android_get_application_class_loader(void)
 {
-    return _class_loader;
+    return CLASS_LOADER;
 }
 
+/* AMC plugin uses g_module_symbol() to find this symbol */
 JavaVM *
 gst_android_get_java_vm(void)
 {
-    return _java_vm;
+    return JAVA_VM;
 }
-
 
 JNIEXPORT void JNICALL
 Java_org_freedesktop_gstreamer_GStreamer_nativeInit(JNIEnv *env, jobject gstreamer, jobject context)
 {
     GError *error = NULL;
-    jmethodID get_class_loader_id = 0;
-
+    CONTEXT = (*env)->NewGlobalRef(env, context);
     jclass context_cls = (*env)->GetObjectClass(env, context);
-    get_class_loader_id = (*env)->GetMethodID(env, context_cls,
-                                              "getClassLoader", "()Ljava/lang/ClassLoader;");
+    jmethodID get_class_loader_id = (*env)->GetMethodID(env, context_cls, "getClassLoader", "()Ljava/lang/ClassLoader;");
     jobject class_loader = (*env)->CallObjectMethod(env, context, get_class_loader_id);
-    _context = (*env)->NewGlobalRef(env, context);
-    _class_loader = (*env)->NewGlobalRef(env, class_loader);
 
-    gst_debug_set_active(TRUE);
-    gst_debug_set_default_threshold(GST_LEVEL_WARNING);
-    gst_debug_remove_log_function(gst_debug_log_default);
+    CLASS_LOADER = (*env)->NewGlobalRef(env, class_loader);
 
     if (!gst_init_check(NULL, NULL, &error))
     {
         gchar *message = g_strdup_printf("GStreamer initialization failed: %s",
                                          error && error->message ? error->message : "(no message)");
         jclass exception_class = (*env)->FindClass(env, "java/lang/Exception");
-        __android_log_print(ANDROID_LOG_ERROR, "GStreamer", "%s", message);
         (*env)->ThrowNew(env, exception_class, message);
         g_free(message);
-        return;
     }
 }
 
 jint JNI_OnLoad(JavaVM *vm, void *reserved)
 {
-    _java_vm = vm;
+    JAVA_VM = vm;
     return JNI_VERSION_1_4;
 }
 
@@ -94,5 +84,6 @@ void JNI_OnUnload(JavaVM *vm, void *reversed)
 {
     JNIEnv *env = NULL;
     (*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_4);
-    (*env)->DeleteGlobalRef(env, _context);
+    (*env)->DeleteGlobalRef(env, CLASS_LOADER);
+    (*env)->DeleteGlobalRef(env, CONTEXT);
 }
