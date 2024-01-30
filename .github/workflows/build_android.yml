@@ -1,9 +1,7 @@
 name: Test Android Build
 
 on:
-  push:
-    paths:
-      - 'android/**'
+  push
 
 jobs:
   create_docker_image:
