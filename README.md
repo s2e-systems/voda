@@ -8,7 +8,7 @@ Additionally a demonstration for Android is available under the android director
 
 The project is developed using only open source and cross platform dependencies.
 
-- GStreamer development and runtime  (v 1.20.1)
+- GStreamer development and runtime  (v 1.20.5)
   - <https://gstreamer.freedesktop.org/download>
 - Eclipse Cyclone DDS™ (v 0.10.2)
   - <https://github.com/eclipse-cyclonedds/cyclonedds>
