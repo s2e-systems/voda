@@ -15,11 +15,6 @@ tasks.register('configure_gstreamer_java', Copy) {
 }
 preBuild.dependsOn configure_gstreamer_java
 
-def keystorePropertiesFile = rootProject.file("keystore.properties")
-def keystoreProperties = new Properties()
-keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-
-
 android {
 
     // Determines the version of Android SDK Platform
@@ -33,6 +28,10 @@ android {
 
     signingConfigs {
         release {
+            def keystorePropertiesFile = rootProject.file("keystore.properties")
+            def keystoreProperties = new Properties()
+            keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
             keyAlias keystoreProperties['keyAlias']
             keyPassword keystoreProperties['keyPassword']
             storeFile file(keystoreProperties['storeFile'])
