@@ -4,57 +4,12 @@
 #include <android/log.h>
 #include <string.h>
 
-/* XXX: Workaround for Android <21 making signal() an inline function
- * around bsd_signal(), and Android >= 21 not having any bsd_signal()
- * symbol but only signal().
- * See https://bugzilla.gnome.org/show_bug.cgi?id=766235
- */
-static gpointer
-load_real_signal(gpointer data)
-{
-    GModule *module;
-    gpointer ret = NULL;
-
-    module = g_module_open("libc.so", G_MODULE_BIND_LOCAL);
-    g_module_symbol(module, "signal", &ret);
-
-    /* As fallback, let's try bsd_signal */
-    if (ret == NULL)
-    {
-        g_warning("Can't find signal(3) in libc.so!");
-        g_module_symbol(module, "bsd_signal", &ret);
-    }
-
-    g_module_close(module);
-
-    return ret;
-}
-
-__sighandler_t bsd_signal(int signum, __sighandler_t handler) __attribute__((weak));
-__sighandler_t bsd_signal(int signum, __sighandler_t handler)
-{
-    static GOnce gonce = G_ONCE_INIT;
-    __sighandler_t (*real_signal)(int signum, __sighandler_t handler);
-
-    g_once(&gonce, load_real_signal, NULL);
-
-    real_signal = gonce.retval;
-    g_assert(real_signal != NULL);
-
-    return real_signal(signum, handler);
-}
 
 static jobject _context = NULL;
 static jobject _class_loader = NULL;
 static JavaVM *_java_vm = NULL;
 static GstClockTime _priv_gst_info_start_time;
 
-#define GST_G_IO_MODULE_DECLARE(name) \
-    extern void G_PASTE(g_io_, G_PASTE(name, _load))(gpointer data)
-
-#define GST_G_IO_MODULE_LOAD(name)       \
-    G_PASTE(g_io_, G_PASTE(name, _load)) \
-    (NULL)
 
 /* Declaration of static plugins */
 GST_PLUGIN_STATIC_DECLARE(androidmedia);
@@ -82,187 +37,6 @@ void gst_init_static_plugins(void)
     GST_PLUGIN_STATIC_REGISTER(videofilter);
     GST_PLUGIN_STATIC_REGISTER(videotestsrc);
     GST_PLUGIN_STATIC_REGISTER(videorate);
-}
-
-/* Call this function to load GIO modules */
-void gst_android_load_gio_modules(void)
-{
-    GTlsBackend *backend;
-    const gchar *ca_certs;
-
-    ca_certs = g_getenv("CA_CERTIFICATES");
-
-    backend = g_tls_backend_get_default();
-    if (backend && ca_certs)
-    {
-        GTlsDatabase *db;
-        GError *error = NULL;
-
-        db = g_tls_file_database_new(ca_certs, &error);
-        if (db)
-        {
-            g_tls_backend_set_default_database(backend, db);
-            g_object_unref(db);
-        }
-        else
-        {
-            g_warning("Failed to create a database from file: %s",
-                      error ? error->message : "Unknown");
-        }
-    }
-}
-
-static void
-glib_print_handler(const gchar *string)
-{
-    __android_log_print(ANDROID_LOG_INFO, "GLib+stdout", "%s", string);
-}
-
-static void
-glib_printerr_handler(const gchar *string)
-{
-    __android_log_print(ANDROID_LOG_ERROR, "GLib+stderr", "%s", string);
-}
-
-/* Based on GLib's default handler */
-#define CHAR_IS_SAFE(wc) (!((wc < 0x20 && wc != '\t' && wc != '\n' && wc != '\r') || \
-                            (wc == 0x7f) ||                                          \
-                            (wc >= 0x80 && wc < 0xa0)))
-#define FORMAT_UNSIGNED_BUFSIZE ((GLIB_SIZEOF_LONG * 3) + 3)
-#define STRING_BUFFER_SIZE (FORMAT_UNSIGNED_BUFSIZE + 32)
-#define ALERT_LEVELS (G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_WARNING)
-#define DEFAULT_LEVELS (G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_WARNING | G_LOG_LEVEL_MESSAGE)
-#define INFO_LEVELS (G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG)
-
-static void
-escape_string(GString *string)
-{
-    const char *p = string->str;
-    gunichar wc;
-
-    while (p < string->str + string->len)
-    {
-        gboolean safe;
-
-        wc = g_utf8_get_char_validated(p, -1);
-        if (wc == (gunichar)-1 || wc == (gunichar)-2)
-        {
-            gchar *tmp;
-            guint pos;
-
-            pos = p - string->str;
-
-            /* Emit invalid UTF-8 as hex escapes
-             */
-            tmp = g_strdup_printf("\\x%02x", (guint)(guchar)*p);
-            g_string_erase(string, pos, 1);
-            g_string_insert(string, pos, tmp);
-
-            p = string->str + (pos + 4); /* Skip over escape sequence */
-
-            g_free(tmp);
-            continue;
-        }
-        if (wc == '\r')
-        {
-            safe = *(p + 1) == '\n';
-        }
-        else
-        {
-            safe = CHAR_IS_SAFE(wc);
-        }
-
-        if (!safe)
-        {
-            gchar *tmp;
-            guint pos;
-
-            pos = p - string->str;
-
-            /* Largest char we escape is 0x0a, so we don't have to worry
-             * about 8-digit \Uxxxxyyyy
-             */
-            tmp = g_strdup_printf("\\u%04x", wc);
-            g_string_erase(string, pos, g_utf8_next_char(p) - p);
-            g_string_insert(string, pos, tmp);
-            g_free(tmp);
-
-            p = string->str + (pos + 6); /* Skip over escape sequence */
-        }
-        else
-            p = g_utf8_next_char(p);
-    }
-}
-
-static void
-glib_log_handler(const gchar *log_domain, GLogLevelFlags log_level,
-                 const gchar *message, gpointer user_data)
-{
-    gchar *string;
-    GString *gstring;
-    const gchar *domains;
-    gint android_log_level;
-    gchar *tag;
-
-    if ((log_level & DEFAULT_LEVELS) || (log_level >> G_LOG_LEVEL_USER_SHIFT))
-        goto emit;
-
-    domains = g_getenv("G_MESSAGES_DEBUG");
-    if (((log_level & INFO_LEVELS) == 0) ||
-        domains == NULL ||
-        (strcmp(domains, "all") != 0 && (!log_domain || !strstr(domains, log_domain))))
-        return;
-
-emit:
-
-    if (log_domain)
-        tag = g_strdup_printf("GLib+%s", log_domain);
-    else
-        tag = g_strdup("GLib");
-
-    switch (log_level & G_LOG_LEVEL_MASK)
-    {
-    case G_LOG_LEVEL_ERROR:
-        android_log_level = ANDROID_LOG_ERROR;
-        break;
-    case G_LOG_LEVEL_CRITICAL:
-        android_log_level = ANDROID_LOG_ERROR;
-        break;
-    case G_LOG_LEVEL_WARNING:
-        android_log_level = ANDROID_LOG_WARN;
-        break;
-    case G_LOG_LEVEL_MESSAGE:
-        android_log_level = ANDROID_LOG_INFO;
-        break;
-    case G_LOG_LEVEL_INFO:
-        android_log_level = ANDROID_LOG_INFO;
-        break;
-    case G_LOG_LEVEL_DEBUG:
-        android_log_level = ANDROID_LOG_DEBUG;
-        break;
-    default:
-        android_log_level = ANDROID_LOG_INFO;
-        break;
-    }
-
-    gstring = g_string_new(NULL);
-    if (!message)
-    {
-        g_string_append(gstring, "(NULL) message");
-    }
-    else
-    {
-        GString *msg = g_string_new(message);
-        escape_string(msg);
-        g_string_append(gstring, msg->str);
-        g_string_free(msg, TRUE);
-    }
-    string = g_string_free(gstring, FALSE);
-
-    __android_log_print(android_log_level, tag, "%s", string);
-
-    g_free(string);
-    g_free(tag);
 }
 
 static void
@@ -596,11 +370,6 @@ void gst_android_init(JNIEnv *env, jobject context)
     g_free(cache_dir);
     g_free(files_dir);
 
-    /* Set GLib print handlers */
-    g_set_print_handler(glib_print_handler);
-    g_set_printerr_handler(glib_printerr_handler);
-    g_log_set_default_handler(glib_log_handler, NULL);
-
     /* Disable this for releases if performance is important
      * or increase the threshold to get more information */
     gst_debug_set_active(TRUE);
@@ -621,7 +390,6 @@ void gst_android_init(JNIEnv *env, jobject context)
         g_free(message);
         return;
     }
-    gst_android_load_gio_modules();
     __android_log_print(ANDROID_LOG_INFO, "GStreamer",
                         "GStreamer initialization complete");
 }
@@ -631,10 +399,6 @@ Java_org_freedesktop_gstreamer_GStreamer_nativeInit(JNIEnv *env, jobject gstream
 {
     gst_android_init(env, context);
 }
-
-// static JNINativeMethod native_methods[] = {
-//         {"nativeInit", "(Landroid/content/Context;)V", (void *) gst_android_init_jni}
-// };
 
 jint JNI_OnLoad(JavaVM *vm, void *reserved)
 {
@@ -647,18 +411,6 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved)
                             "Could not retrieve JNIEnv");
         return -1;
     }
-    //    jclass klass = (*env)->FindClass (env, "org/freedesktop/gstreamer/GStreamer");
-    //    if (!klass) {
-    //        __android_log_print (ANDROID_LOG_ERROR, "GStreamer",
-    //                             "Could not retrieve class org.freedesktop.gstreamer.GStreamer");
-    //        return -2;
-    //    }
-    //    if ((*env)->RegisterNatives (env, klass, native_methods,
-    //                                 G_N_ELEMENTS (native_methods))) {
-    //        __android_log_print (ANDROID_LOG_ERROR, "GStreamer",
-    //                             "Could not register native methods for org.freedesktop.gstreamer.GStreamer");
-    //        return -3;
-    //    }
 
     /* Remember Java VM */
     _java_vm = vm;
