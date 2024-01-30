@@ -41,4 +41,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build Android
-        run: ./android/gradlew --project-dir android build
+        run: ./android/gradlew --project-dir android buildDebug
