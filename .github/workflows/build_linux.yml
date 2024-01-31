@@ -1,9 +1,7 @@
 name: Test Linux Build
 
 on:
-  push:
-    paths-ignore:
-      - 'android/*'
+  push
 
 jobs:
   create_docker_image:

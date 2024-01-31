@@ -7,7 +7,7 @@ RUN wget https://dl.google.com/android/repository/commandlinetools-linux-1040699
     && mv cmdline-tools/* . \
     && rm -r commandlinetools-linux-10406996_latest.zip cmdline-tools
 RUN yes | ./bin/sdkmanager --licenses
-RUN ./bin/sdkmanager --install "build-tools;30.0.3" "ndk;25.1.8937393"
+RUN ./bin/sdkmanager --install "build-tools;34.0.0" "ndk;25.1.8937393"
 ENV ANDROID_HOME=/android_sdk
 
 WORKDIR /home
@@ -53,7 +53,7 @@ RUN apt-get update && apt-get install -y \
     cmake ninja-build openjdk-19-jre-headless xz-utils curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/local/gstreamer-1.0-android-universal
-RUN curl https://gstreamer.freedesktop.org/pkg/android/1.20.5/gstreamer-1.0-android-universal-1.20.5.tar.xz | tar --extract --xz
+RUN curl https://gstreamer.freedesktop.org/pkg/android/1.22.6/gstreamer-1.0-android-universal-1.22.6.tar.xz | tar --extract --xz
 WORKDIR /home/root
 COPY --from=CycloneDdsAndroidBuilder /android_sdk /android_sdk
 COPY --from=CycloneDdsAndroidBuilder /usr/local/cyclonedds /usr/local/

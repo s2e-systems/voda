@@ -1,9 +1,7 @@
 name: Test Android Build
 
 on:
-  push:
-    paths:
-      - 'android/*'
+  push
 
 jobs:
   create_docker_image:
@@ -43,4 +41,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build Android
-        run: ./android/gradlew --project-dir android build
+        run: ./android/gradlew --project-dir android bundleDebug

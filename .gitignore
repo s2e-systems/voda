@@ -7,4 +7,4 @@ android/.build-ndk
 android/.build-gradle
 local.properties
 .editorconfig
-/gstreamer-1.0-android-universal-1.22.6
+android/keystore.properties
