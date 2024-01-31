@@ -7,7 +7,7 @@ RUN wget https://dl.google.com/android/repository/commandlinetools-linux-1040699
     && mv cmdline-tools/* . \
     && rm -r commandlinetools-linux-10406996_latest.zip cmdline-tools
 RUN yes | ./bin/sdkmanager --licenses
-RUN ./bin/sdkmanager --install "build-tools;30.0.3" "ndk;25.1.8937393"
+RUN ./bin/sdkmanager --install "build-tools;34.0.0" "ndk;25.1.8937393"
 ENV ANDROID_HOME=/android_sdk
 
 WORKDIR /home
