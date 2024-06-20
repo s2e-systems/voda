@@ -1,10 +1,3 @@
-.vscode
-CMakeUserPresets.json
-build
-android/.gradle
-android/.idea
-android/.build-ndk
-android/.build-gradle
-local.properties
-.editorconfig
-android/keystore.properties
+/target
+Cargo.lock
+

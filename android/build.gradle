@@ -1,9 +1,19 @@
-plugins {
-    // Determines the version of the Android SDK Build-Tools:
-    id 'com.android.application' version '8.2.1' apply false
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.4.2'
+    }
 }
-task clean(type: Delete) {
-    delete rootProject.buildDir
-    delete new File(rootProject.projectDir, ".build-ndk")
-    delete new File(rootProject.projectDir, ".build-gradle")
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
 }
