@@ -1,0 +1,90 @@
+version: 2.1
+
+parameters:
+  build_linux_docker_image:
+    type: boolean
+    default: false
+  build_android_docker_image:
+    type: boolean
+    default: false
+
+jobs:
+  build_and_push_linux_docker_image:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build Docker image
+          command: docker build --file .circleci/Dockerfile.linux --tag s2esystems/voda_linux:1.75.0 .
+      - run:
+          name: Push image to DockerHub
+          command: |
+            echo $DOCKERHUB_ACCESS_TOKEN | docker login --username $DOCKERHUB_USERNAME --password-stdin
+            docker push s2esystems/voda_linux:1.75.0
+
+  build_and_push_android_docker_image:
+    docker:
+      - image: cimg/base:current
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build Android Docker image
+          command: docker build --file .circleci/Dockerfile.android --tag s2esystems/voda_android:1.75.0 .
+      - run:
+          name: Push Android image to DockerHub
+          command: |
+            echo $DOCKERHUB_ACCESS_TOKEN | docker login --username $DOCKERHUB_USERNAME --password-stdin
+            docker push s2esystems/voda_android:1.75.0
+
+  build_linux_and_clippy:
+    docker:
+      - image: s2esystems/voda_linux:1.75.0
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: |
+            cargo build
+            cargo clippy -- -D warnings
+
+  build_android:
+    docker:
+      - image: s2esystems/voda_android:1.75.0
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: |
+            ./android/gradlew --project-dir android bundleDebug
+
+workflows:
+  build_docker_image_and_run_build_linux_and_clippy:
+    when: << pipeline.parameters.build_linux_docker_image >>
+    jobs:
+      - build_and_push_linux_docker_image
+      - build_linux_and_clippy:
+          requires:
+            - build_and_push_linux_docker_image
+
+  run_build_linux_and_clippy:
+    when:
+      not: << pipeline.parameters.build_linux_docker_image >>
+    jobs:
+      - build_linux_and_clippy
+
+  build_docker_image_and_run_build_android:
+    when: << pipeline.parameters.build_android_docker_image >>
+    jobs:
+      - build_and_push_android_docker_image
+      - build_android:
+          requires:
+            - build_and_push_android_docker_image
+
+  run_build_android:
+    when:
+      not: << pipeline.parameters.build_android_docker_image >>
+    jobs:
+      - build_android

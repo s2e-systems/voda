@@ -1,0 +1,16 @@
+version: 2.1
+
+setup: true
+
+orbs:
+  path-filtering: circleci/path-filtering@1.0.0
+
+workflows:
+  setup-workflow:
+    jobs:
+      - path-filtering/filter:
+          base-revision: main
+          config-path: .circleci/continue-config.yml
+          mapping: |
+            .circleci/Dockerfile.linux build_linux_docker_image true
+            .circleci/Dockerfile.android build_android_docker_image true

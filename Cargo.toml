@@ -1,0 +1,18 @@
+[package]
+name = "dust-voda"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "publisher"
+path = "src/main_publisher.rs"
+
+[[bin]]
+name = "subscriber"
+path = "src/main_subscriber.rs"
+
+[dependencies]
+dust_dds = { version = "0.10", git = "https://github.com/s2e-systems/dust-dds", branch = "main"}
+gstreamer = "0.22.4"
+gstreamer-app = "0.22.0"
+
