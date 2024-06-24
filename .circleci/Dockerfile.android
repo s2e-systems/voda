@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /usr/local/gstreamer-1.0-android-universal
 RUN curl https://gstreamer.freedesktop.org/data/pkg/android/1.24.5/gstreamer-1.0-android-universal-1.24.5.tar.xz | tar --extract --xz
 WORKDIR /home/root
-COPY --from=AndroidBuilder /android_sdk /android_sdk
+COPY --from=AndroidBuilder --chown=circleci /android_sdk /android_sdk
 ENV ANDROID_HOME=/android_sdk
 ENV GSTREAMER_1_0_ROOT_ANDROID=/usr/local/gstreamer-1.0-android-universal
 
