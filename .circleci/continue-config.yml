@@ -58,7 +58,7 @@ jobs:
       - run:
           name: Build
           command: |
-            cargo build
+            ./android/gradlew --project-dir android bundleDebug
 
 workflows:
   build_docker_image_and_run_build_linux_and_clippy:
