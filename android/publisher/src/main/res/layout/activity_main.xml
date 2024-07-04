@@ -2,8 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="fill_parent"
-android:layout_height="fill_parent"
-android:orientation="vertical" >
+    android:layout_height="fill_parent"
+    android:orientation="vertical">
 
     <SurfaceView
         android:id="@+id/surface_video"
@@ -14,21 +14,49 @@ android:orientation="vertical" >
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="bottom"
-        android:orientation="vertical" >
+        android:orientation="vertical">
 
         <TextView
             android:id="@+id/textview_message"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="32dip"
+            android:layout_marginTop="32dip"
             android:fontFamily="sans-serif-condensed"
             android:gravity="center_horizontal"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:shadowRadius="10"
             android:shadowColor="#555555"
+            android:shadowRadius="10"
+            android:textColor="#FFFFFF"
+            android:textSize="20dip"
+            android:textStyle="bold"
             tools:text="VoDA Publisher" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="bottom"
+            android:orientation="vertical">
+
+            <ToggleButton
+                android:id="@+id/toggleButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="30dip"
+                android:backgroundTint="#00CCCCCC"
+                android:drawableRight="@drawable/pub_sub_selector"
+                android:drawableTint="@android:color/white"
+                android:drawableTintMode="src_in"
+                android:fontFamily="sans-serif-condensed"
+                android:maxHeight="70dip"
+                android:minHeight="60dip"
+                android:outlineSpotShadowColor="#00CCCCCC"
+                android:textAlignment="textEnd"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textOff="⇄ Publisher"
+                android:textOn="⇆ Subscriber"
+                android:textSize="21dip" />
+
+        </LinearLayout>
+
     </LinearLayout>
 </FrameLayout>
