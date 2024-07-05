@@ -1,8 +1,15 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{qos::QosKind, status::NO_STATUS},
+    infrastructure::{
+        qos::QosKind,
+        status::{StatusKind, NO_STATUS},
+    },
+    subscription::{
+        data_reader_listener::DataReaderListener,
+        sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
+    },
 };
-use gstreamer::{self, prelude::*, DebugCategory, DebugLevel, DebugMessage};
+use gstreamer::{self, prelude::*, DebugCategory, DebugLevel, DebugMessage, Element};
 use gstreamer_video_sys::GstVideoOverlay;
 use jni::{
     objects::{GlobalRef, JClass, JObject, JValueGen},
@@ -10,10 +17,19 @@ use jni::{
     JNIEnv, JavaVM,
 };
 use ndk_sys::android_LogPriority;
-use std::ffi::CString;
+use std::{ffi::CString, thread::JoinHandle};
 
+#[derive(Debug)]
 struct VodaError(String);
-
+impl VodaError {
+    fn android_log_write(&self) {
+        android_log_write(
+            android_LogPriority::ANDROID_LOG_ERROR,
+            "VoDA",
+            &format!("Creating pipeline failed with: {}", self.0),
+        )
+    }
+}
 impl std::fmt::Display for VodaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -58,7 +74,11 @@ struct Video<'a> {
 static mut JAVA_VM: Option<JavaVM> = None;
 static mut CLASS_LOADER: Option<GlobalRef> = None;
 
-static mut GSTREAMER_VIDEO_PIPELINE: Option<gstreamer::Pipeline> = None;
+enum Application {
+    Publisher(gstreamer::Pipeline),
+    Subscriber(gstreamer::Pipeline),
+}
+static mut APPLICATION: Option<Application> = None;
 
 fn android_log_write(prio: android_LogPriority, tag: &str, msg: &str) {
     let tag_c = CString::new(tag).expect("tag str not converted to CString");
@@ -175,8 +195,12 @@ unsafe extern "C" fn Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceIn
     _: JClass,
     surface: jni::sys::jobject,
 ) {
-    if let Some(pipeline) = GSTREAMER_VIDEO_PIPELINE.as_ref() {
-        let overlay = pipeline.by_interface(gstreamer_video::VideoOverlay::static_type());
+    if let Some(application) = APPLICATION.as_ref() {
+        let overlay = match application {
+            Application::Publisher(pipeline) => pipeline,
+            Application::Subscriber(pipeline) => pipeline,
+        }
+        .by_interface(gstreamer_video::VideoOverlay::static_type());
         if let Some(overlay) = &overlay {
             let overlay = overlay.as_ptr() as *mut GstVideoOverlay;
             let native_window = ndk_sys::ANativeWindow_fromSurface(env.get_raw(), surface);
@@ -187,9 +211,9 @@ unsafe extern "C" fn Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceIn
         }
     } else {
         android_log_write(
-            android_LogPriority::ANDROID_LOG_ERROR,
+            android_LogPriority::ANDROID_LOG_INFO,
             "VoDA",
-            "Pipeline not initialized yet",
+            "Application not initialized yet",
         );
     }
 }
@@ -228,11 +252,11 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
                             return;
                         }
                     }
-                    Err(e) => {
+                    Err(err) => {
                         android_log_write(
                             android_LogPriority::ANDROID_LOG_ERROR,
                             "VoDA",
-                            &format!("{}", e),
+                            &format!("{}", err),
                         );
                         return;
                     }
@@ -247,11 +271,11 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
                 return;
             }
         },
-        Err(e) => {
+        Err(err) => {
             android_log_write(
                 android_LogPriority::ANDROID_LOG_ERROR,
                 "VoDA",
-                &format!("{}", e),
+                &format!("{}", err),
             );
             return;
         }
@@ -309,35 +333,95 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
     gst_plugin_androidmedia_register();
 }
 
-/// Creates the GStreamer pipeline and stores it as a global
+/// Creates the GStreamer publisher pipeline and stores it as a global
+/// # Safety
+/// Must initialize the global APPLICATION
+#[no_mangle]
+unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunPublisher(
+    _env: JNIEnv,
+    _: JClass,
+) {
+    if let Some(appliaction) = APPLICATION.as_ref() {
+        match appliaction {
+            Application::Publisher(_) => (),
+            Application::Subscriber(pipeline) => {
+                pipeline.set_state(gstreamer::State::Null).unwrap();
+                match create_pipeline_publisher() {
+                    Ok(new_pipeline) => {
+                        start_pipeline_in_thread(&new_pipeline).expect("Start pipeline in thread");
+                        APPLICATION = Some(Application::Publisher(new_pipeline));
+                    }
+                    Err(err) => err.android_log_write(),
+                }
+            }
+        }
+    } else {
+        match create_pipeline_publisher() {
+            Ok(new_pipeline) => {
+                start_pipeline_in_thread(&new_pipeline).expect("Start pipeline in thread");
+                APPLICATION = Some(Application::Publisher(new_pipeline));
+            }
+            Err(err) => err.android_log_write(),
+        }
+    }
+}
+
+/// Creates the GStreamer subscriber pipeline and stores it as a global
 /// # Safety
 /// Must initialize the global GStreamer pipeline
 #[no_mangle]
-unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRun(_env: JNIEnv, _: JClass) {
-    match create_pipeline() {
-        Ok(pipeline) => {
-            GSTREAMER_VIDEO_PIPELINE = Some(pipeline);
-            std::thread::spawn(move || {
-                main_loop(GSTREAMER_VIDEO_PIPELINE.as_ref().expect("Pipeline is some"))
-                    .unwrap_or_else(|e| {
-                        android_log_write(
-                            android_LogPriority::ANDROID_LOG_ERROR,
-                            "VoDA",
-                            &e.to_string(),
-                        )
-                    })
-            });
+unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunSubscriber(
+    _env: JNIEnv,
+    _: JClass,
+) {
+    if let Some(appliaction) = APPLICATION.as_ref() {
+        match appliaction {
+            Application::Subscriber(_) => (),
+            Application::Publisher(pipeline) => {
+                pipeline.set_state(gstreamer::State::Null).unwrap();
+                match create_pipeline_subscriber() {
+                    Ok(new_pipeline) => {
+                        start_pipeline_in_thread(&new_pipeline).expect("Start pipeline in thread");
+                        APPLICATION = Some(Application::Subscriber(new_pipeline));
+                    }
+                    Err(err) => err.android_log_write(),
+                }
+            }
         }
-        Err(err) => android_log_write(
-            android_LogPriority::ANDROID_LOG_ERROR,
-            "VoDA",
-            &format!("Creating pipeline failed with: {}", err),
-        ),
-    };
+    } else {
+        match create_pipeline_subscriber() {
+            Ok(new_pipeline) => {
+                start_pipeline_in_thread(&new_pipeline).expect("Start pipeline in thread");
+                APPLICATION = Some(Application::Subscriber(new_pipeline));
+            }
+            Err(err) => err.android_log_write(),
+        }
+    }
 }
 
-fn create_pipeline() -> Result<gstreamer::Pipeline, VodaError> {
-    let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=1280000 ! appsink name=appsink max-buffers=1 sync=false")?;
+fn start_pipeline_in_thread(pipeline: &gstreamer::Pipeline) -> Result<JoinHandle<()>, VodaError> {
+    pipeline.set_state(gstreamer::State::Playing)?;
+    let bus = pipeline.bus().expect("Pipeline has bus");
+    let join_handle = std::thread::spawn(move || {
+        for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
+            match msg.view() {
+                gstreamer::MessageView::Eos(..) => break,
+                gstreamer::MessageView::Error(err) => android_log_write(
+                    android_LogPriority::ANDROID_LOG_ERROR,
+                    "VoDA",
+                    &format!("Error message: {}", err.to_string()),
+                ),
+                _ => (),
+            }
+        }
+    });
+
+    //pipeline.set_state(gstreamer::State::Null).unwrap();
+    Ok(join_handle)
+}
+
+fn create_pipeline_publisher() -> Result<gstreamer::Pipeline, VodaError> {
+    let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=1280000 ! appsink name=app_sink max-buffers=1 sync=false")?;
 
     let participant = DomainParticipantFactory::get_instance().create_participant(
         0,
@@ -357,15 +441,15 @@ fn create_pipeline() -> Result<gstreamer::Pipeline, VodaError> {
     let pipeline = pipeline_element
         .dynamic_cast::<gstreamer::Pipeline>()
         .expect("Pipeline is expected to be a bin");
-    let sink = pipeline
-        .by_name("appsink")
-        .ok_or(VodaError("appsink missing".to_string()))?;
-    let appsink = sink
+    let app_sink_element = pipeline
+        .by_name("app_sink")
+        .ok_or(VodaError("app_sink not found".to_string()))?;
+    let app_sink = app_sink_element
         .dynamic_cast::<gstreamer_app::AppSink>()
-        .expect("Sink element is expected to be an appsink!");
+        .expect("is type AppSink");
 
     let mut i = 0;
-    appsink.set_callbacks(
+    app_sink.set_callbacks(
         gstreamer_app::AppSinkCallbacks::builder()
             .new_sample(move |s| {
                 if let Ok(sample) = s.pull_sample() {
@@ -392,26 +476,83 @@ fn create_pipeline() -> Result<gstreamer::Pipeline, VodaError> {
     Ok(pipeline)
 }
 
-fn main_loop(pipeline: &gstreamer::Pipeline) -> Result<(), VodaError> {
-    pipeline.set_state(gstreamer::State::Playing)?;
+fn create_pipeline_subscriber() -> Result<gstreamer::Pipeline, VodaError> {
+    struct Listener {
+        appsrc: gstreamer_app::AppSrc,
+    }
 
-    let bus = pipeline
-        .bus()
-        .expect("Pipeline without bus. Shouldn't happen!");
+    impl<'a> DataReaderListener<'a> for Listener {
+        type Foo = Video<'a>;
 
-    for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
-        match msg.view() {
-            gstreamer::MessageView::Eos(..) => break,
-            gstreamer::MessageView::Error(err) => {
-                pipeline.set_state(gstreamer::State::Null)?;
-                Err(err)?;
+        fn on_data_available(
+            &mut self,
+            the_reader: dust_dds::subscription::data_reader::DataReader<Self::Foo>,
+        ) {
+            if let Ok(samples) =
+                the_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+            {
+                for sample in samples {
+                    if let Ok(sample_data) = sample.data() {
+                        android_log_write(
+                            android_LogPriority::ANDROID_LOG_INFO,
+                            "VoDA",
+                            &format!("sample received: {:?}", sample_data.frame_num),
+                        );
+
+                        let mut buffer = gstreamer::Buffer::with_size(sample_data.frame.len())
+                            .expect("buffer creation failed");
+                        {
+                            let buffer_ref = buffer.get_mut().expect("mutable buffer");
+                            let mut buffer_samples =
+                                buffer_ref.map_writable().expect("writeable buffer");
+                            buffer_samples.clone_from_slice(sample_data.frame);
+                        }
+                        self.appsrc
+                            .push_buffer(buffer)
+                            .expect("push buffer into appsrc succeeds");
+                    }
+                }
             }
-            _ => (),
         }
     }
-    pipeline.set_state(gstreamer::State::Null)?;
+    let pipeline_element = gstreamer::parse::launch(
+        "appsrc name=app_src ! openh264dec ! videoconvert ! glimagesink sync=false",
+    )?;
+    let bin = pipeline_element
+        .downcast_ref::<gstreamer::Bin>()
+        .expect("Pipeline is bin");
+    let appsrc_element = bin.by_name("app_src").expect("Pipeline has appsrc");
+    let appsrc = appsrc_element
+        .downcast::<gstreamer_app::AppSrc>()
+        .expect("is AppSrc type");
+    let src_caps = gstreamer::Caps::builder("video/x-h264")
+        .field("stream-format", "byte-stream")
+        .field("alignment", "au")
+        .field("profile", "constrained-baseline")
+        .build();
+    appsrc.set_caps(Some(&src_caps));
 
-    Ok(())
+    let factory = DomainParticipantFactory::get_instance();
+    let participant = factory.create_participant(0, QosKind::Default, None, NO_STATUS)?;
+    let topic = participant.create_topic::<Video>(
+        "VideoStream",
+        "Video",
+        QosKind::Default,
+        None,
+        NO_STATUS,
+    )?;
+    let subscriber = participant.create_subscriber(QosKind::Default, None, NO_STATUS)?;
+    let _reader = subscriber.create_datareader::<Video>(
+        &topic,
+        QosKind::Default,
+        Some(Box::new(Listener { appsrc })),
+        &[StatusKind::DataAvailable],
+    )?;
+
+    let pipeline = pipeline_element
+        .dynamic_cast::<gstreamer::Pipeline>()
+        .expect("Pipeline is a bin");
+    Ok(pipeline)
 }
 
 /// Store Java VM

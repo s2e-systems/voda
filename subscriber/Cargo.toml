@@ -1,0 +1,9 @@
+[package]
+name = "voda-subscriber"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dust_dds = { version = "0.10" }
+gstreamer = "0.22.4"
+gstreamer-app = "0.22.0"

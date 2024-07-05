@@ -38,6 +38,7 @@ android {
 
 cargo {
     module = "."
+    targetDirectory = "../../target"
     libname = "voda"
     targets = ["arm", "x86", "arm64", "x86_64"]
     verbose = true
