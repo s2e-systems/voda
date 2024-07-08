@@ -10,8 +10,8 @@ use dust_dds::{
     },
 };
 use gstreamer::{
-    self, prelude::*, ClockTime, DebugCategory, DebugLevel, DebugMessage, Element, Pipeline,
-    StateChangeReturn, StateChangeSuccess,
+    self, prelude::*, ClockTime, DebugCategory, DebugLevel, DebugMessage, Pipeline,
+    StateChangeSuccess,
 };
 use gstreamer_video_sys::GstVideoOverlay;
 use jni::{
@@ -417,25 +417,10 @@ unsafe extern "C" fn gst_android_get_application_class_loader() -> jni::sys::job
 }
 
 unsafe fn set_window_handle(pipeline: &Pipeline, native_window: usize) {
-    android_log_write(
-        android_LogPriority::ANDROID_LOG_INFO,
-        "VoDA",
-        "set_window_handle",
-    );
     let bus = pipeline.bus().expect("Pipeline has bus");
     let (state_change, ..) = pipeline.state(ClockTime::ZERO);
     if state_change == Ok(gstreamer::StateChangeSuccess::Async) {
-        android_log_write(
-            android_LogPriority::ANDROID_LOG_INFO,
-            "VoDA",
-            "start waiting for set_window_handle",
-        );
-        for msg in bus.iter_timed(gstreamer::ClockTime::from_mseconds(100)) {
-            android_log_write(
-                android_LogPriority::ANDROID_LOG_INFO,
-                "VoDA",
-                "waiting for set_window_handle",
-            );
+        for msg in bus.iter_timed(gstreamer::ClockTime::from_mseconds(10)) {
             if let (Ok(StateChangeSuccess::Success), ..) = pipeline.state(ClockTime::ZERO) {
                 break;
             }
@@ -597,7 +582,10 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
 /// # Safety
 /// Must initialize the global APPLICATION
 #[no_mangle]
-unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunPublisher(env: JNIEnv, _: JClass) {
+unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunPublisher(
+    _env: JNIEnv,
+    _: JClass,
+) {
     APPLICATION = None;
     match Publisher::new() {
         Ok(publisher) => {
@@ -632,162 +620,6 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunSubscriber(
             err.android_log_write();
         }
     };
-}
-
-fn start_pipeline_in_thread(pipeline: &gstreamer::Pipeline) -> Result<JoinHandle<()>, VodaError> {
-    pipeline.set_state(gstreamer::State::Playing)?;
-    let bus = pipeline.bus().expect("Pipeline has bus");
-    let join_handle = std::thread::spawn(move || {
-        for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
-            match msg.view() {
-                gstreamer::MessageView::Eos(..) => break,
-                gstreamer::MessageView::Error(err) => android_log_write(
-                    android_LogPriority::ANDROID_LOG_ERROR,
-                    "VoDA",
-                    &format!("Error message: {}", err.to_string()),
-                ),
-                _ => (),
-            }
-        }
-    });
-
-    //pipeline.set_state(gstreamer::State::Null).unwrap();
-    Ok(join_handle)
-}
-
-fn create_pipeline_publisher() -> Result<gstreamer::Pipeline, VodaError> {
-    let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=1280000 ! appsink name=app_sink max-buffers=1 sync=false")?;
-
-    let participant = DomainParticipantFactory::get_instance().create_participant(
-        0,
-        QosKind::Default,
-        None,
-        NO_STATUS,
-    )?;
-    let topic = participant.create_topic::<Video>(
-        "VideoStream",
-        "Video",
-        QosKind::Default,
-        None,
-        NO_STATUS,
-    )?;
-    let publisher = participant.create_publisher(QosKind::Default, None, NO_STATUS)?;
-    let writer = publisher.create_datawriter(&topic, QosKind::Default, None, NO_STATUS)?;
-    let pipeline = pipeline_element
-        .dynamic_cast::<gstreamer::Pipeline>()
-        .expect("Pipeline is expected to be a bin");
-    let app_sink_element = pipeline
-        .by_name("app_sink")
-        .ok_or(VodaError("app_sink not found".to_string()))?;
-    let app_sink = app_sink_element
-        .dynamic_cast::<gstreamer_app::AppSink>()
-        .expect("is type AppSink");
-
-    let mut i = 0;
-    app_sink.set_callbacks(
-        gstreamer_app::AppSinkCallbacks::builder()
-            .new_sample(move |s| {
-                if let Ok(sample) = s.pull_sample() {
-                    let buffer_map = sample
-                        .buffer()
-                        .expect("buffer exists")
-                        .map_readable()
-                        .expect("readable buffer");
-                    let video_sample = Video {
-                        user_id: 8,
-                        frame_num: i,
-                        frame: buffer_map.as_slice(),
-                    };
-                    i += 1;
-                    if writer.write(&video_sample, None).is_err() {
-                        return Err(gstreamer::FlowError::Error);
-                    };
-                }
-                Ok(gstreamer::FlowSuccess::Ok)
-            })
-            .build(),
-    );
-
-    Ok(pipeline)
-}
-
-fn create_pipeline_subscriber() -> Result<gstreamer::Pipeline, VodaError> {
-    struct Listener {
-        appsrc: gstreamer_app::AppSrc,
-    }
-
-    impl<'a> DataReaderListener<'a> for Listener {
-        type Foo = Video<'a>;
-
-        fn on_data_available(
-            &mut self,
-            the_reader: dust_dds::subscription::data_reader::DataReader<Self::Foo>,
-        ) {
-            if let Ok(samples) =
-                the_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
-            {
-                for sample in samples {
-                    if let Ok(sample_data) = sample.data() {
-                        android_log_write(
-                            android_LogPriority::ANDROID_LOG_INFO,
-                            "VoDA",
-                            &format!("sample received: {:?}", sample_data.frame_num),
-                        );
-
-                        let mut buffer = gstreamer::Buffer::with_size(sample_data.frame.len())
-                            .expect("buffer creation failed");
-                        {
-                            let buffer_ref = buffer.get_mut().expect("mutable buffer");
-                            let mut buffer_samples =
-                                buffer_ref.map_writable().expect("writeable buffer");
-                            buffer_samples.clone_from_slice(sample_data.frame);
-                        }
-                        self.appsrc
-                            .push_buffer(buffer)
-                            .expect("push buffer into appsrc succeeds");
-                    }
-                }
-            }
-        }
-    }
-    let pipeline_element = gstreamer::parse::launch(
-        "appsrc name=app_src ! openh264dec ! videoconvert ! glimagesink sync=false",
-    )?;
-    let bin = pipeline_element
-        .downcast_ref::<gstreamer::Bin>()
-        .expect("Pipeline is bin");
-    let appsrc_element = bin.by_name("app_src").expect("Pipeline has appsrc");
-    let appsrc = appsrc_element
-        .downcast::<gstreamer_app::AppSrc>()
-        .expect("is AppSrc type");
-    let src_caps = gstreamer::Caps::builder("video/x-h264")
-        .field("stream-format", "byte-stream")
-        .field("alignment", "au")
-        .field("profile", "constrained-baseline")
-        .build();
-    appsrc.set_caps(Some(&src_caps));
-
-    let factory = DomainParticipantFactory::get_instance();
-    let participant = factory.create_participant(0, QosKind::Default, None, NO_STATUS)?;
-    let topic = participant.create_topic::<Video>(
-        "VideoStream",
-        "Video",
-        QosKind::Default,
-        None,
-        NO_STATUS,
-    )?;
-    let subscriber = participant.create_subscriber(QosKind::Default, None, NO_STATUS)?;
-    let _reader = subscriber.create_datareader::<Video>(
-        &topic,
-        QosKind::Default,
-        Some(Box::new(Listener { appsrc })),
-        &[StatusKind::DataAvailable],
-    )?;
-
-    let pipeline = pipeline_element
-        .dynamic_cast::<gstreamer::Pipeline>()
-        .expect("Pipeline is a bin");
-    Ok(pipeline)
 }
 
 /// Store Java VM
