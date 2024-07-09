@@ -9,10 +9,7 @@ use dust_dds::{
         sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
     },
 };
-use gstreamer::{
-    self, prelude::*, ClockTime, DebugCategory, DebugLevel, DebugMessage, Pipeline,
-    StateChangeSuccess,
-};
+use gstreamer::{self, prelude::*, DebugCategory, DebugLevel, DebugMessage, Pipeline};
 use gstreamer_video_sys::GstVideoOverlay;
 use jni::{
     objects::{GlobalRef, JClass, JObject, JValueGen},
@@ -372,34 +369,21 @@ fn gstreamer_log_function(
         DebugLevel::Debug => android_LogPriority::ANDROID_LOG_DEBUG,
         _ => android_LogPriority::ANDROID_LOG_VERBOSE,
     };
-
+    let ts = gstreamer::get_timestamp();
     let tag = format!("GStreamer+{}", category.name());
-    match object {
+    let msg = match object {
         Some(obj) => {
             let label = obj.to_string();
-            let msg = format!(
-                "{} {}:{}:{}:{} {}",
-                gstreamer::get_timestamp(),
-                file,
-                line,
-                function,
-                label,
-                message.get().unwrap()
-            );
-            android_log_write(prio, &tag, &msg);
+            format!(
+                "{} {}:{}:{}:{} {:?}",
+                ts, file, line, function, label, message
+            )
         }
         None => {
-            let msg = format!(
-                "{} {}:{}:{} {}",
-                gstreamer::get_timestamp(),
-                file,
-                line,
-                function,
-                message.get().unwrap()
-            );
-            android_log_write(prio, &tag, &msg);
+            format!("{} {}:{}:{} {:?}", ts, file, line, function, message)
         }
-    }
+    };
+    android_log_write(prio, &tag, &msg);
 }
 
 /// This functions is searched by name by the androidmedia plugin. It must hence be present
@@ -434,8 +418,6 @@ unsafe fn set_window_handle_to_overlay_in_pipeline(pipeline: &Pipeline, native_w
         overlay.as_ptr() as *mut GstVideoOverlay,
         native_window,
     );
-
-    pipeline.set_state(gstreamer::State::Playing).unwrap();
 }
 
 /// Sets the surface to the GStreamer video system
@@ -488,8 +470,8 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
                 match env.exception_check() {
                     Ok(value) => {
                         if value {
-                            env.exception_describe().unwrap();
-                            env.exception_clear().unwrap();
+                            env.exception_describe().expect("exception describable");
+                            env.exception_clear().expect("exception clearable");
                             return;
                         }
                     }

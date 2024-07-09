@@ -3,6 +3,6 @@ resolver = "2"
 members = [
     "subscriber",
     "publisher",
-    "android/publisher",
+    "android/app",
 ]
 default-members = ["subscriber", "publisher"]
