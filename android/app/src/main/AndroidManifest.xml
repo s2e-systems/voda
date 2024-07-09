@@ -10,8 +10,8 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/publisher_launcher"
-        android:label="VoDA Publisher"
+        android:icon="@mipmap/voda_launcher"
+        android:label="VoDA"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar">
         <activity android:name="com.s2e_systems.MainActivity"
