@@ -74,6 +74,21 @@ static mut JAVA_VM: Option<JavaVM> = None;
 static mut CLASS_LOADER: Option<GlobalRef> = None;
 static mut NATIVE_WINDOW: Option<usize> = None;
 
+static mut APPLICATION: Option<Application> = None;
+
+/// Convenience function that removes the DDS domain participant from domain 0
+fn delete_participant() {
+    let factory = DomainParticipantFactory::get_instance();
+    if let Ok(Some(participant)) = &factory.lookup_participant(0) {
+        if let Err(err) = participant.delete_contained_entities() {
+            VodaError::from(err).android_log_write();
+        }
+        if let Err(err) = factory.delete_participant(participant) {
+            VodaError::from(err).android_log_write();
+        }
+    }
+}
+
 struct Publisher {
     pipeline: gstreamer::Pipeline,
     join_handle: Option<JoinHandle<()>>,
@@ -81,7 +96,7 @@ struct Publisher {
 
 impl Publisher {
     fn new() -> Result<Self, VodaError> {
-        let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=1280000 ! appsink name=app_sink max-buffers=1 sync=false")?;
+        let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink name=app_sink max-buffers=1 sync=false")?;
 
         let participant = DomainParticipantFactory::get_instance().create_participant(
             0,
@@ -101,9 +116,7 @@ impl Publisher {
         let pipeline = pipeline_element
             .dynamic_cast::<gstreamer::Pipeline>()
             .expect("Pipeline is expected to be a bin");
-        let app_sink_element = pipeline
-            .by_name("app_sink")
-            .ok_or(VodaError("app_sink not found".to_string()))?;
+        let app_sink_element = pipeline.by_name("app_sink").expect("has element");
         let app_sink = app_sink_element
             .dynamic_cast::<gstreamer_app::AppSink>()
             .expect("is type AppSink");
@@ -141,7 +154,9 @@ impl Publisher {
             for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
                 match msg.view() {
                     gstreamer::MessageView::StateChanged(s) => {
-                        if s.current() == gstreamer::State::Null {
+                        if s.current() == gstreamer::State::Null
+                            || s.pending() == gstreamer::State::Null
+                        {
                             break;
                         }
                     }
@@ -164,8 +179,12 @@ impl Publisher {
 
 impl Drop for Publisher {
     fn drop(&mut self) {
-        self.pipeline.set_state(gstreamer::State::Null).unwrap();
-        self.join_handle.take().expect("must run").join().unwrap();
+        self.pipeline
+            .set_state(gstreamer::State::Null)
+            .expect("pipeline settable to Null");
+        if let Some(join_handle) = self.join_handle.take() {
+            join_handle.join().expect("publisher thread joinable");
+        };
         delete_participant();
     }
 }
@@ -284,22 +303,14 @@ impl Subscriber {
     }
 }
 
-fn delete_participant() {
-    let factory = DomainParticipantFactory::get_instance();
-    if let Ok(Some(participant)) = &factory.lookup_participant(0) {
-        if let Err(err) = participant.delete_contained_entities() {
-            VodaError::from(err).android_log_write();
-        }
-        if let Err(err) = factory.delete_participant(participant) {
-            VodaError::from(err).android_log_write();
-        }
-    }
-}
-
 impl Drop for Subscriber {
     fn drop(&mut self) {
-        self.pipeline.set_state(gstreamer::State::Null).unwrap();
-        self.join_handle.take().expect("must run").join().unwrap();
+        self.pipeline
+            .set_state(gstreamer::State::Null)
+            .expect("pipeline settable to Null");
+        if let Some(join_handle) = self.join_handle.take() {
+            join_handle.join().expect("Subscriber thread joinable");
+        };
         delete_participant();
     }
 }
@@ -308,7 +319,6 @@ enum Application {
     Publisher(Publisher),
     Subscriber(Subscriber),
 }
-static mut APPLICATION: Option<Application> = None;
 
 fn android_log_write(prio: android_LogPriority, tag: &str, msg: &str) {
     let tag_c = CString::new(tag).expect("tag str not converted to CString");
@@ -416,30 +426,16 @@ unsafe extern "C" fn gst_android_get_application_class_loader() -> jni::sys::job
     }
 }
 
-unsafe fn set_window_handle(pipeline: &Pipeline, native_window: usize) {
-    let bus = pipeline.bus().expect("Pipeline has bus");
-    let (state_change, ..) = pipeline.state(ClockTime::ZERO);
-    if state_change == Ok(gstreamer::StateChangeSuccess::Async) {
-        for msg in bus.iter_timed(gstreamer::ClockTime::from_mseconds(10)) {
-            if let (Ok(StateChangeSuccess::Success), ..) = pipeline.state(ClockTime::ZERO) {
-                break;
-            }
-            match msg.view() {
-                gstreamer::MessageView::AsyncDone(..) => break,
-                gstreamer::MessageView::Eos(..) => break,
-                gstreamer::MessageView::Error(err) => {
-                    VodaError::from(err).android_log_write();
-                    break;
-                }
-                _ => (),
-            }
-        }
-    }
-    let overlay = pipeline.by_interface(gstreamer_video::VideoOverlay::static_type());
-    if let Some(overlay) = &overlay {
-        let overlay = overlay.as_ptr() as *mut GstVideoOverlay;
-        gstreamer_video_sys::gst_video_overlay_set_window_handle(overlay, native_window)
-    }
+unsafe fn set_window_handle_to_overlay_in_pipeline(pipeline: &Pipeline, native_window: usize) {
+    let overlay = pipeline
+        .by_interface(gstreamer_video::VideoOverlay::static_type())
+        .expect("Pipeline has VideoOverlay");
+    gstreamer_video_sys::gst_video_overlay_set_window_handle(
+        overlay.as_ptr() as *mut GstVideoOverlay,
+        native_window,
+    );
+
+    pipeline.set_state(gstreamer::State::Playing).unwrap();
 }
 
 /// Sets the surface to the GStreamer video system
@@ -457,7 +453,7 @@ unsafe extern "C" fn Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceIn
             Application::Publisher(p) => &p.pipeline,
             Application::Subscriber(s) => &s.pipeline,
         };
-        set_window_handle(pipeline, native_window);
+        set_window_handle_to_overlay_in_pipeline(pipeline, native_window);
     }
     NATIVE_WINDOW = Some(native_window);
 }
@@ -590,7 +586,7 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunPublisher(
     match Publisher::new() {
         Ok(publisher) => {
             if let Some(native_window) = NATIVE_WINDOW {
-                set_window_handle(&publisher.pipeline, native_window);
+                set_window_handle_to_overlay_in_pipeline(&publisher.pipeline, native_window);
             }
             APPLICATION = Some(Application::Publisher(publisher));
         }
@@ -612,7 +608,7 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunSubscriber(
     match Subscriber::new() {
         Ok(subscriber) => {
             if let Some(native_window) = NATIVE_WINDOW {
-                set_window_handle(&subscriber.pipeline, native_window);
+                set_window_handle_to_overlay_in_pipeline(&subscriber.pipeline, native_window);
             }
             APPLICATION = Some(Application::Subscriber(subscriber));
         }
