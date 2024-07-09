@@ -2,6 +2,7 @@ package com.s2e_systems;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.view.SurfaceHolder;
 import android.widget.CompoundButton;
 import android.widget.Toast;
@@ -32,8 +33,15 @@ public class MainActivity extends Activity implements CompoundButton.OnCheckedCh
     }
     private static native void nativeRunPublisher();
     private static native void nativeRunSubscriber();
+    private static native void nativeRotationChanged(int rotation);
     private ActivityMainBinding binding;
     private SharedPreferences preferences;
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        nativeRotationChanged(getWindowManager().getDefaultDisplay().getRotation());
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +72,7 @@ public class MainActivity extends Activity implements CompoundButton.OnCheckedCh
         } else {
             nativeRunPublisher();
         }
+        onConfigurationChanged(this.getResources().getConfiguration());
     }
 
     @Override

@@ -82,7 +82,7 @@ cargo {
         rustflag_list.add("-lc++abi")
         rustflag_list.add("-lffi -lz")
         rustflag_list.add("-liconv -lorc-0.4 -lgmodule-2.0 -lpcre2-8")
-        rustflag_list.add("-lgstcoreelements -lgstvideo-1.0 -lgstapp")
+        rustflag_list.add("-lgstcoreelements -lgstvideo-1.0 -lgstapp -lgstvideofilter")
         rustflag_list.add("-lgstopengl -lgstgl-1.0 -lgstcontroller-1.0 -lgraphene-1.0 -ljpeg -lpng16")
         rustflag_list.add("-lopenh264 -lgstopenh264 -lgstpbutils-1.0 -lgstvideoconvertscale")
         rustflag_list.add("-lgstandroidmedia -lgstaudio-1.0 -lgstphotography-1.0")

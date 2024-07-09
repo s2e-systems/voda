@@ -93,7 +93,7 @@ struct Publisher {
 
 impl Publisher {
     fn new() -> Result<Self, VodaError> {
-        let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink name=app_sink max-buffers=1 sync=false")?;
+        let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink name=app_sink max-buffers=1 sync=false")?;
 
         let participant = DomainParticipantFactory::get_instance().create_participant(
             0,
@@ -424,6 +424,33 @@ unsafe fn set_window_handle_to_overlay_in_pipeline(pipeline: &Pipeline, native_w
 /// # Safety
 /// Must use the ndk and the global instance of the gstreamer pipeline
 #[no_mangle]
+unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRotationChanged(
+    _env: JNIEnv,
+    _: JClass,
+    rotation: jni::sys::jint,
+) {
+    if let Some(application) = APPLICATION.as_ref() {
+        match application {
+            Application::Publisher(p) => {
+                let video_direction = match rotation {
+                    0 => gstreamer_video::VideoOrientationMethod::_90r,
+                    1 => gstreamer_video::VideoOrientationMethod::Identity,
+                    3 => gstreamer_video::VideoOrientationMethod::_180,
+                    _ => gstreamer_video::VideoOrientationMethod::Identity,
+                };
+
+                let videoflip = p.pipeline.by_name("videoflip0").expect("has element");
+                videoflip.set_property_from_value("video-direction", &video_direction.to_value());
+            }
+            Application::Subscriber(_) => (),
+        };
+    }
+}
+
+/// Sets the surface to the GStreamer video system
+/// # Safety
+/// Must use the ndk and the global instance of the gstreamer pipeline
+#[no_mangle]
 unsafe extern "C" fn Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceInit(
     env: JNIEnv,
     _: JClass,
@@ -546,6 +573,7 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
         fn gst_plugin_openh264_register();
         fn gst_plugin_videoconvertscale_register();
         fn gst_plugin_androidmedia_register();
+        fn gst_plugin_videofilter_register();
     }
 
     gst_plugin_opengl_register();
@@ -554,6 +582,7 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
     gst_plugin_openh264_register();
     gst_plugin_videoconvertscale_register();
     gst_plugin_androidmedia_register();
+    gst_plugin_videofilter_register();
 }
 
 /// Creates the GStreamer publisher pipeline and stores it as a global
