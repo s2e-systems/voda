@@ -3,3 +3,5 @@ Cargo.lock
 
 android/.build-gradle
 android/.build-ndk
+android/app/keystore.jks
+android/keystore.properties

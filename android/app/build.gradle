@@ -26,6 +26,28 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    signingConfigs {
+        release {
+            def keystorePropertiesFile = rootProject.file("keystore.properties")
+            def keystoreProperties = new Properties()
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            debuggable false
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
     layout.buildDirectory = new File(rootProject.projectDir, "/build/gradle/" + project.name)
 
     buildFeatures {
@@ -43,6 +65,7 @@ cargo {
     targets = ["arm", "x86", "arm64", "x86_64"]
     verbose = true
     prebuiltToolchains = true
+    profile = 'release'
     exec { spec, toolchain ->
         // Host tag as described in https://developer.android.com/ndk/guides/other_build_systems
         String host_tag = ""
