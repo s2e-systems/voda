@@ -22,7 +22,7 @@ android {
     ndkVersion "25.2.9519653" //r25c
     defaultConfig {
         applicationId "com.s2e_systems.publisher"
-        minSdkVersion 28
+        minSdkVersion 26
         versionCode 1
         versionName "1.0"
     }

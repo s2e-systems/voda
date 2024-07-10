@@ -17,7 +17,7 @@ use jni::{
     JNIEnv, JavaVM,
 };
 use ndk_sys::android_LogPriority;
-use std::{ffi::CString, thread::JoinHandle};
+use std::{ffi::CString, sync::Mutex, thread::JoinHandle};
 
 #[derive(Debug)]
 struct VodaError(String);
@@ -71,7 +71,7 @@ static mut JAVA_VM: Option<JavaVM> = None;
 static mut CLASS_LOADER: Option<GlobalRef> = None;
 static mut NATIVE_WINDOW: Option<usize> = None;
 
-static mut APPLICATION: Option<Application> = None;
+static APPLICATION: Mutex<Option<Application>> = Mutex::new(None);
 
 /// Convenience function that removes the DDS domain participant from domain 0
 fn delete_participant() {
@@ -93,7 +93,7 @@ struct Publisher {
 
 impl Publisher {
     fn new() -> Result<Self, VodaError> {
-        let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink name=app_sink max-buffers=1 sync=false")?;
+        let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip name=video_flip ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink name=app_sink max-buffers=1 sync=false")?;
 
         let participant = DomainParticipantFactory::get_instance().create_participant(
             0,
@@ -180,7 +180,9 @@ impl Drop for Publisher {
             .set_state(gstreamer::State::Null)
             .expect("pipeline settable to Null");
         if let Some(join_handle) = self.join_handle.take() {
-            join_handle.join().expect("publisher thread joinable");
+            if let Err(_) = join_handle.join() {
+                VodaError("publisher join failed".to_string()).android_log_write();
+            }
         };
         delete_participant();
     }
@@ -306,7 +308,9 @@ impl Drop for Subscriber {
             .set_state(gstreamer::State::Null)
             .expect("pipeline settable to Null");
         if let Some(join_handle) = self.join_handle.take() {
-            join_handle.join().expect("Subscriber thread joinable");
+            if let Err(_) = join_handle.join() {
+                VodaError("Subscriber join failed".to_string()).android_log_write();
+            }
         };
         delete_participant();
     }
@@ -429,21 +433,21 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRotationChanged(
     _: JClass,
     rotation: jni::sys::jint,
 ) {
-    if let Some(application) = APPLICATION.as_ref() {
-        match application {
-            Application::Publisher(p) => {
-                let video_direction = match rotation {
-                    0 => gstreamer_video::VideoOrientationMethod::_90r,
-                    1 => gstreamer_video::VideoOrientationMethod::Identity,
-                    3 => gstreamer_video::VideoOrientationMethod::_180,
-                    _ => gstreamer_video::VideoOrientationMethod::Identity,
-                };
+    if let Ok(application) = APPLICATION.lock() {
+        if let Some(Application::Publisher(p)) = application.as_ref() {
+            let video_direction = match rotation {
+                0 => gstreamer_video::VideoOrientationMethod::_90r,
+                1 => gstreamer_video::VideoOrientationMethod::Identity,
+                3 => gstreamer_video::VideoOrientationMethod::_180,
+                _ => gstreamer_video::VideoOrientationMethod::Identity,
+            };
 
-                let videoflip = p.pipeline.by_name("videoflip0").expect("has element");
-                videoflip.set_property_from_value("video-direction", &video_direction.to_value());
+            match p.pipeline.by_name("video_flip") {
+                Some(videoflip) => videoflip
+                    .set_property_from_value("video-direction", &video_direction.to_value()),
+                None => VodaError("videoflip not present".to_string()).android_log_write(),
             }
-            Application::Subscriber(_) => (),
-        };
+        }
     }
 }
 
@@ -457,12 +461,14 @@ unsafe extern "C" fn Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceIn
     surface: jni::sys::jobject,
 ) {
     let native_window = ndk_sys::ANativeWindow_fromSurface(env.get_raw(), surface) as usize;
-    if let Some(application) = APPLICATION.as_ref() {
-        let pipeline = match application {
-            Application::Publisher(p) => &p.pipeline,
-            Application::Subscriber(s) => &s.pipeline,
-        };
-        set_window_handle_to_overlay_in_pipeline(pipeline, native_window);
+    if let Ok(application_lock) = APPLICATION.lock() {
+        if let Some(application) = application_lock.as_ref() {
+            let pipeline = match application {
+                Application::Publisher(p) => &p.pipeline,
+                Application::Subscriber(s) => &s.pipeline,
+            };
+            set_window_handle_to_overlay_in_pipeline(pipeline, native_window);
+        }
     }
     NATIVE_WINDOW = Some(native_window);
 }
@@ -476,6 +482,7 @@ unsafe extern "C" fn Java_com_s2e_1systems_SurfaceHolderCallback_nativeSurfaceFi
     _: JClass,
     surface: jni::sys::jobject,
 ) {
+    VodaError("nativeSurfaceFinalize called".to_string()).android_log_write();
     ndk_sys::ANativeWindow_release(ndk_sys::ANativeWindow_fromSurface(env.get_raw(), surface));
 }
 
@@ -593,18 +600,20 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunPublisher(
     _env: JNIEnv,
     _: JClass,
 ) {
-    APPLICATION = None;
-    match Publisher::new() {
-        Ok(publisher) => {
-            if let Some(native_window) = NATIVE_WINDOW {
-                set_window_handle_to_overlay_in_pipeline(&publisher.pipeline, native_window);
+    if let Ok(mut application_lock) = APPLICATION.lock() {
+        *application_lock = None;
+        match Publisher::new() {
+            Ok(publisher) => {
+                if let Some(native_window) = NATIVE_WINDOW {
+                    set_window_handle_to_overlay_in_pipeline(&publisher.pipeline, native_window);
+                }
+                *application_lock = Some(Application::Publisher(publisher));
             }
-            APPLICATION = Some(Application::Publisher(publisher));
-        }
-        Err(err) => {
-            err.android_log_write();
-        }
-    };
+            Err(err) => {
+                err.android_log_write();
+            }
+        };
+    }
 }
 
 /// Creates the GStreamer subscriber pipeline and stores it as a global
@@ -615,18 +624,20 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRunSubscriber(
     _env: JNIEnv,
     _: JClass,
 ) {
-    APPLICATION = None;
-    match Subscriber::new() {
-        Ok(subscriber) => {
-            if let Some(native_window) = NATIVE_WINDOW {
-                set_window_handle_to_overlay_in_pipeline(&subscriber.pipeline, native_window);
+    if let Ok(mut application_lock) = APPLICATION.lock() {
+        *application_lock = None;
+        match Subscriber::new() {
+            Ok(subscriber) => {
+                if let Some(native_window) = NATIVE_WINDOW {
+                    set_window_handle_to_overlay_in_pipeline(&subscriber.pipeline, native_window);
+                }
+                *application_lock = Some(Application::Subscriber(subscriber));
             }
-            APPLICATION = Some(Application::Subscriber(subscriber));
+            Err(err) => {
+                err.android_log_write();
+            }
         }
-        Err(err) => {
-            err.android_log_write();
-        }
-    };
+    }
 }
 
 /// Store Java VM
