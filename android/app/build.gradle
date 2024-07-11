@@ -18,11 +18,12 @@ tasks.register('configure_gstreamer_java', Copy) {
 }
 
 android {
-    compileSdk 34
+    compileSdk 35
     ndkVersion "25.2.9519653" //r25c
     defaultConfig {
         applicationId "com.s2e_systems.voda"
-        minSdkVersion 26
+        minSdk 26
+        targetSdk 35
         versionCode 1
         versionName "1.0"
     }
