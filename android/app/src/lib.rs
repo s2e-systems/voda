@@ -1,12 +1,15 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
-        qos::QosKind,
+        qos::{DataReaderQos, QosKind},
+        qos_policy::HistoryQosPolicy,
         status::{StatusKind, NO_STATUS},
     },
     subscription::{
         data_reader_listener::DataReaderListener,
-        sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
+        sample_info::{
+            SampleStateKind, ViewStateKind, ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE,
+        },
     },
 };
 use gstreamer::{self, prelude::*, DebugCategory, DebugLevel, DebugMessage, Pipeline};
@@ -197,6 +200,7 @@ impl Subscriber {
     fn new() -> Result<Self, VodaError> {
         struct Listener {
             appsrc: gstreamer_app::AppSrc,
+            last_received: i32,
         }
 
         impl<'a> DataReaderListener<'a> for Listener {
@@ -206,16 +210,30 @@ impl Subscriber {
                 &mut self,
                 the_reader: dust_dds::subscription::data_reader::DataReader<Self::Foo>,
             ) {
-                if let Ok(samples) =
-                    the_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
-                {
+                if let Ok(samples) = the_reader.read(
+                    1,
+                    &[SampleStateKind::NotRead],
+                    ANY_VIEW_STATE,
+                    ANY_INSTANCE_STATE,
+                ) {
                     for sample in samples {
                         if let Ok(sample_data) = sample.data() {
-                            android_log_write(
-                                android_LogPriority::ANDROID_LOG_INFO,
-                                "VoDA",
-                                &format!("sample received: {:?}", sample_data.frame_num),
-                            );
+                            if self.last_received != sample_data.frame_num - 1
+                                && self.last_received != 0
+                            {
+                                android_log_write(android_LogPriority::ANDROID_LOG_INFO,
+                                    "VoDA",
+                                    &format!("!!! frame_num unexpected, got: {:?}, previous received one: {:?}",
+                                    sample_data.frame_num, self.last_received)
+                                );
+                            }
+                            self.last_received = sample_data.frame_num;
+
+                            // android_log_write(
+                            //     android_LogPriority::ANDROID_LOG_INFO,
+                            //     "VoDA",
+                            //     &format!("sample received: {:?}", sample_data.frame_num),
+                            // );
 
                             let mut buffer = gstreamer::Buffer::with_size(sample_data.frame.len())
                                 .expect("buffer creation failed");
@@ -262,8 +280,16 @@ impl Subscriber {
         let subscriber = participant.create_subscriber(QosKind::Default, None, NO_STATUS)?;
         let _reader = subscriber.create_datareader::<Video>(
             &topic,
-            QosKind::Default,
-            Some(Box::new(Listener { appsrc })),
+            QosKind::Specific(DataReaderQos {
+                history: HistoryQosPolicy {
+                    kind: dust_dds::infrastructure::qos_policy::HistoryQosPolicyKind::KeepLast(10),
+                },
+                ..Default::default()
+            }),
+            Some(Box::new(Listener {
+                appsrc,
+                last_received: 0,
+            })),
             &[StatusKind::DataAvailable],
         )?;
 

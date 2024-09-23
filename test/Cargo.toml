@@ -1,0 +1,7 @@
+[package]
+name = "interceptor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dust_dds = { version = "0.10" }

@@ -56,7 +56,9 @@ fn main() -> Result<(), Error> {
     let writer = publisher.create_datawriter(&topic, QosKind::Default, None, NO_STATUS)?;
 
     let pipeline = gstreamer::parse::launch(
-        r#"autovideosrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink max-buffers=1 name=appsink sync=false t. ! queue leaky=2 ! taginject tags="title=Publisher" ! autovideosink"#,
+        r#"autovideosrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] !
+        tee name=t ! queue leaky=2 ! videoconvert ! openh264enc complexity=0 bitrate=512000 ! h264parse ! video/x-h264,alignment=au,stream-format=byte-stream ! appsink max-buffers=1 name=appsink sync=false
+        t. ! queue leaky=2 ! taginject tags="title=Publisher" ! autovideosink"#,
     )?;
 
     pipeline.set_state(gstreamer::State::Playing)?;
@@ -91,8 +93,6 @@ fn main() -> Result<(), Error> {
 
                     i += 1;
                     println!("Wrote sample {:?}", i);
-                    use std::io::{self, Write};
-                    io::stdout().flush().ok();
                 }
 
                 Ok(gstreamer::FlowSuccess::Ok)
