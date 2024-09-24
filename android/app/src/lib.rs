@@ -100,7 +100,8 @@ impl Publisher {
             r"ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip name=video_flip ! tee name=t ! 
             queue leaky=2 max-size-buffers=1 ! glimagesink 
             t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! 
-            openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! 
+            openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=1512000 !
+            h264parse ! video/x-h264,alignment=nal,stream-format=byte-stream ! 
             appsink name=app_sink max-buffers=1 sync=false"
         )?;
 
@@ -258,7 +259,7 @@ impl Subscriber {
             }
         }
         let pipeline_element = gstreamer::parse::launch(
-            "appsrc name=app_src ! openh264dec ! videoconvert ! glimagesink sync=false",
+            "appsrc name=app_src ! h264parse ! openh264dec ! videoconvert ! glimagesink sync=false",
         )?;
         let bin = pipeline_element
             .downcast_ref::<gstreamer::Bin>()
@@ -269,7 +270,7 @@ impl Subscriber {
             .expect("is AppSrc type");
         let src_caps = gstreamer::Caps::builder("video/x-h264")
             .field("stream-format", "byte-stream")
-            .field("alignment", "au")
+            .field("alignment", "nal")
             .field("profile", "constrained-baseline")
             .build();
         appsrc.set_caps(Some(&src_caps));
@@ -613,6 +614,7 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
         fn gst_plugin_videoconvertscale_register();
         fn gst_plugin_androidmedia_register();
         fn gst_plugin_videofilter_register();
+        fn gst_plugin_videoparsersbad_register();
     }
 
     gst_plugin_opengl_register();
@@ -622,6 +624,7 @@ unsafe extern "C" fn Java_org_freedesktop_gstreamer_GStreamer_nativeInit(
     gst_plugin_videoconvertscale_register();
     gst_plugin_androidmedia_register();
     gst_plugin_videofilter_register();
+    gst_plugin_videoparsersbad_register();
 }
 
 /// Creates the GStreamer publisher pipeline and stores it as a global
