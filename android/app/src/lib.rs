@@ -96,7 +96,13 @@ struct Publisher {
 
 impl Publisher {
     fn new() -> Result<Self, VodaError> {
-        let pipeline_element = gstreamer::parse::launch("ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip name=video_flip ! tee name=t ! queue leaky=2 max-size-buffers=1 ! glimagesink t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink name=app_sink max-buffers=1 sync=false")?;
+        let pipeline_element = gstreamer::parse::launch(
+            r"ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip name=video_flip ! tee name=t ! 
+            queue leaky=2 max-size-buffers=1 ! glimagesink 
+            t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! 
+            openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! 
+            appsink name=app_sink max-buffers=1 sync=false"
+        )?;
 
         let participant = DomainParticipantFactory::get_instance().create_participant(
             0,
