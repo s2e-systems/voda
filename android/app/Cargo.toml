@@ -8,11 +8,11 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-gstreamer = "0.22.6"
-gstreamer-app = "0.22.6"
-gstreamer-video = "0.22.6"
-gstreamer-video-sys = "0.22.6"
-glib = "0.19.9"
-dust_dds = { version = "0.10" }
+gstreamer = "0.23.0"
+gstreamer-app = "0.23.0"
+gstreamer-video = "0.23.0"
+gstreamer-video-sys = "0.23.0"
+glib = "0.20.3"
+dust_dds = { version = "0.11" }
 jni = { version = "0.21.1", default-features = false }
 ndk-sys = "0.6.0"
