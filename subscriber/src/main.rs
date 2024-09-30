@@ -3,13 +3,10 @@ use dust_dds::{
     infrastructure::{
         error::DdsError,
         qos::{DataReaderQos, QosKind},
-        qos_policy::HistoryQosPolicy,
+        qos_policy::{HistoryQosPolicy, ReliabilityQosPolicy},
         status::{StatusKind, NO_STATUS},
     },
-    subscription::{
-        data_reader_listener::DataReaderListener,
-        sample_info::{SampleStateKind, ANY_INSTANCE_STATE, ANY_VIEW_STATE},
-    },
+    subscription::data_reader_listener::DataReaderListener,
 };
 use gstreamer::prelude::*;
 
@@ -60,38 +57,30 @@ impl<'a> DataReaderListener<'a> for Listener {
         &mut self,
         the_reader: dust_dds::subscription::data_reader::DataReader<Self::Foo>,
     ) {
-        if let Ok(samples) = the_reader.read(
-            1,
-            &[SampleStateKind::NotRead],
-            ANY_VIEW_STATE,
-            ANY_INSTANCE_STATE,
-        ) {
-            if let Some(sample) = samples.last() {
-                if let Ok(sample_data) = sample.data() {
-                    println!("sample received: {:?}", sample_data.frame_num);
-                    if self.last_received != sample_data.frame_num - 1 && self.last_received != 0 {
-                        println!(
-                            "!!! frame_num unexpected, got: {:?}, previous received one: {:?}",
-                            sample_data.frame_num, self.last_received
-                        );
-                    }
-                    self.last_received = sample_data.frame_num;
-
-                    let mut buffer = gstreamer::Buffer::with_size(sample_data.frame.len())
-                        .expect("buffer creation failed");
-                    {
-                        let buffer_ref = buffer.get_mut().expect("mutable buffer");
-                        let mut buffer_samples =
-                            buffer_ref.map_writable().expect("writeable buffer");
-                        buffer_samples.clone_from_slice(sample_data.frame);
-                    }
-                    self.appsrc
-                        .push_buffer(buffer)
-                        .expect("push buffer into appsrc to succeed");
-
-                    use std::io::{self, Write};
-                    io::stdout().flush().ok();
+        if let Ok(sample) = the_reader.take_next_sample() {
+            if let Ok(sample_data) = sample.data() {
+                println!("sample received: {:?}", sample_data.frame_num);
+                if self.last_received != sample_data.frame_num - 1 && self.last_received != 0 {
+                    println!(
+                        "!!! frame_num unexpected, got: {:?}, previous received one: {:?}",
+                        sample_data.frame_num, self.last_received
+                    );
                 }
+                self.last_received = sample_data.frame_num;
+
+                let mut buffer =
+                    gstreamer::Buffer::with_size(sample_data.frame.len()).expect("buffer creation");
+                {
+                    let buffer_ref = buffer.get_mut().expect("mutable buffer");
+                    let mut buffer_samples = buffer_ref.map_writable().expect("writeable buffer");
+                    buffer_samples.clone_from_slice(sample_data.frame);
+                }
+                self.appsrc
+                    .push_buffer(buffer)
+                    .expect("push buffer into appsrc to succeed");
+
+                use std::io::{self, Write};
+                io::stdout().flush().ok();
             }
         }
     }
@@ -114,7 +103,8 @@ fn main() -> Result<(), Error> {
     let subscriber = participant.create_subscriber(QosKind::Default, None, NO_STATUS)?;
 
     let pipeline = gstreamer::parse::launch(
-        r#"appsrc name=appsrc ! openh264dec ! videoconvert ! taginject tags="title=Subscriber" ! autovideosink"#,
+        r#"appsrc name=appsrc ! h264parse ! openh264dec ! videoconvert ! 
+        taginject tags="title=Subscriber" ! autovideosink"#,
     )?;
 
     pipeline.set_state(gstreamer::State::Playing)?;
@@ -128,16 +118,19 @@ fn main() -> Result<(), Error> {
         .expect("is AppSrc type");
     let src_caps = gstreamer::Caps::builder("video/x-h264")
         .field("stream-format", "byte-stream")
-        .field("alignment", "au")
-        .field("profile", "constrained-baseline")
+        .field("alignment", "nal")
         .build();
     appsrc.set_caps(Some(&src_caps));
 
     let _reader = subscriber.create_datareader(
         &topic,
         QosKind::Specific(DataReaderQos {
+            reliability: ReliabilityQosPolicy {
+                kind: dust_dds::infrastructure::qos_policy::ReliabilityQosPolicyKind::BestEffort,
+                max_blocking_time: dust_dds::infrastructure::time::DurationKind::Infinite,
+            },
             history: HistoryQosPolicy {
-                kind: dust_dds::infrastructure::qos_policy::HistoryQosPolicyKind::KeepLast(2),
+                kind: dust_dds::infrastructure::qos_policy::HistoryQosPolicyKind::KeepLast(10),
             },
             ..Default::default()
         }),

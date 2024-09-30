@@ -1,6 +1,11 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{error::DdsError, qos::QosKind, status::NO_STATUS},
+    infrastructure::{
+        error::DdsError,
+        qos::{DataWriterQos, QosKind},
+        qos_policy::{HistoryQosPolicy, ReliabilityQosPolicy},
+        status::NO_STATUS,
+    },
 };
 use gstreamer::prelude::*;
 
@@ -53,16 +58,29 @@ fn main() -> Result<(), Error> {
         NO_STATUS,
     )?;
     let publisher = participant.create_publisher(QosKind::Default, None, NO_STATUS)?;
-    let writer = publisher.create_datawriter(&topic, QosKind::Default, None, NO_STATUS)?;
-
-    let pipeline = gstreamer::parse::launch(
-        r#"autovideosrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! 
-        queue leaky=downstream ! videoconvert ! openh264enc complexity=0 bitrate=512000 ! 
-        h264parse ! video/x-h264,alignment=nal,stream-format=byte-stream ! appsink max-buffers=1 name=appsink sync=false
-        t. ! queue leaky=downstream ! taginject tags="title=Publisher" ! autovideosink"#,
+    let writer = publisher.create_datawriter(
+        &topic,
+        QosKind::Specific(DataWriterQos {
+            reliability: ReliabilityQosPolicy {
+                kind: dust_dds::infrastructure::qos_policy::ReliabilityQosPolicyKind::Reliable,
+                max_blocking_time: dust_dds::infrastructure::time::DurationKind::Infinite,
+            },
+            history: HistoryQosPolicy {
+                kind: dust_dds::infrastructure::qos_policy::HistoryQosPolicyKind::KeepLast(10),
+            },
+            ..Default::default()
+        }),
+        None,
+        NO_STATUS,
     )?;
 
-    pipeline.set_state(gstreamer::State::Playing)?;
+    let pipeline = gstreamer::parse::launch(
+        r#"autovideosrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! 
+        tee name=t ! queue leaky=downstream leaky=downstream max-size-buffers=1 ! taginject tags="title=Publisher" ! autovideosink
+        t. ! queue leaky=downstream leaky=downstream max-size-buffers=1 !
+        videoconvert ! openh264enc complexity=low gop-size=25 bitrate=1024000 num-slices=4 ! 
+        h264parse ! video/x-h264,alignment=nal,stream-format=byte-stream ! appsink max-buffers=1 name=appsink sync=false"#,
+    )?;
 
     let bin = pipeline
         .downcast_ref::<gstreamer::Bin>()
@@ -82,24 +100,22 @@ fn main() -> Result<(), Error> {
                         .expect("buffer exists")
                         .map_readable()
                         .expect("readable buffer");
-
                     let video_sample = Video {
                         user_id: 8,
                         frame_num: i,
                         frame: bytes.as_slice(),
                     };
-                    writer
-                        .write(&video_sample, None)
-                        .expect("Sample could not be written");
-
+                    match writer.write(&video_sample, None) {
+                        Ok(_) => println!("Wrote sample {:?}", i),
+                        Err(_) => println!("Skipped sample {:?}", i),
+                    }
                     i += 1;
-                    println!("Wrote sample {:?}", i);
                 }
-
                 Ok(gstreamer::FlowSuccess::Ok)
             })
             .build(),
     );
+    pipeline.set_state(gstreamer::State::Playing)?;
 
     // Wait until error or EOS
     let bus = pipeline.bus().expect("pipeline has bus");

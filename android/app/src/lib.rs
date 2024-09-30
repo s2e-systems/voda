@@ -1,15 +1,16 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
-        qos::{DataReaderQos, QosKind},
-        qos_policy::HistoryQosPolicy,
+        qos::{DataReaderQos, DataWriterQos, QosKind},
+        qos_policy::{
+            HistoryQosPolicy, HistoryQosPolicyKind, ReliabilityQosPolicy, ReliabilityQosPolicyKind,
+        },
         status::{StatusKind, NO_STATUS},
+        time::DurationKind,
     },
     subscription::{
         data_reader_listener::DataReaderListener,
-        sample_info::{
-            SampleStateKind, ViewStateKind, ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE,
-        },
+        sample_info::{SampleStateKind, ANY_INSTANCE_STATE, ANY_VIEW_STATE},
     },
 };
 use gstreamer::{self, prelude::*, DebugCategory, DebugLevel, DebugMessage, Pipeline};
@@ -97,12 +98,11 @@ struct Publisher {
 impl Publisher {
     fn new() -> Result<Self, VodaError> {
         let pipeline_element = gstreamer::parse::launch(
-            r"ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip name=video_flip ! tee name=t ! 
-            queue leaky=2 max-size-buffers=1 ! glimagesink 
-            t. ! queue leaky=2 max-size-buffers=1 ! videoconvert ! 
-            openh264enc min-force-key-unit-interval=1000000000 complexity=0 scene-change-detection=0 background-detection=0 bitrate=1512000 !
-            h264parse ! video/x-h264,alignment=nal,stream-format=byte-stream ! 
-            appsink name=app_sink max-buffers=1 sync=false"
+            r"ahcsrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! videoflip name=video_flip ! 
+            tee name=t ! queue leaky=downstream max-size-buffers=1 ! glimagesink 
+            t. ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! 
+            openh264enc complexity=low gop-size=25 bitrate=1024000 num-slices=8 !
+            h264parse ! video/x-h264,alignment=nal,stream-format=byte-stream ! appsink name=app_sink max-buffers=1 sync=false",
         )?;
 
         let participant = DomainParticipantFactory::get_instance().create_participant(
@@ -119,7 +119,21 @@ impl Publisher {
             NO_STATUS,
         )?;
         let publisher = participant.create_publisher(QosKind::Default, None, NO_STATUS)?;
-        let writer = publisher.create_datawriter(&topic, QosKind::Default, None, NO_STATUS)?;
+        let writer = publisher.create_datawriter(
+            &topic,
+            QosKind::Specific(DataWriterQos {
+                reliability: ReliabilityQosPolicy {
+                    kind: ReliabilityQosPolicyKind::Reliable,
+                    max_blocking_time: DurationKind::Infinite,
+                },
+                history: HistoryQosPolicy {
+                    kind: HistoryQosPolicyKind::KeepLast(10),
+                },
+                ..Default::default()
+            }),
+            None,
+            NO_STATUS,
+        )?;
         let pipeline = pipeline_element
             .dynamic_cast::<gstreamer::Pipeline>()
             .expect("Pipeline is expected to be a bin");
@@ -144,8 +158,8 @@ impl Publisher {
                             frame: buffer_map.as_slice(),
                         };
                         i += 1;
-                        if writer.write(&video_sample, None).is_err() {
-                            return Err(gstreamer::FlowError::Error);
+                        if let Err(err) = writer.write(&video_sample, None) {
+                            VodaError::from(err).android_log_write();
                         };
                     }
                     Ok(gstreamer::FlowSuccess::Ok)
@@ -271,7 +285,6 @@ impl Subscriber {
         let src_caps = gstreamer::Caps::builder("video/x-h264")
             .field("stream-format", "byte-stream")
             .field("alignment", "nal")
-            .field("profile", "constrained-baseline")
             .build();
         appsrc.set_caps(Some(&src_caps));
 
@@ -289,7 +302,7 @@ impl Subscriber {
             &topic,
             QosKind::Specific(DataReaderQos {
                 history: HistoryQosPolicy {
-                    kind: dust_dds::infrastructure::qos_policy::HistoryQosPolicyKind::KeepLast(10),
+                    kind: HistoryQosPolicyKind::KeepLast(10),
                 },
                 ..Default::default()
             }),
