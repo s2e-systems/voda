@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="camera_needed">Camera needed to stream video over DDS</string>
+    <string name="camera_permission_denied">Camera permission denied. Go to permission settings.</string>
+</resources>

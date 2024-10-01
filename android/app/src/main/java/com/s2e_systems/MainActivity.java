@@ -1,6 +1,6 @@
 package com.s2e_systems;
 
-import android.app.Activity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.view.SurfaceHolder;
@@ -8,6 +8,10 @@ import android.widget.CompoundButton;
 import android.widget.Toast;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import org.freedesktop.gstreamer.GStreamer;
 import com.s2e_systems.databinding.ActivityMainBinding;
@@ -27,7 +31,7 @@ class SurfaceHolderCallback implements SurfaceHolder.Callback {
     }
 }
 
-public class MainActivity extends Activity implements CompoundButton.OnCheckedChangeListener {
+public class MainActivity extends AppCompatActivity implements CompoundButton.OnCheckedChangeListener {
     static {
         System.loadLibrary("voda");
     }
@@ -36,6 +40,7 @@ public class MainActivity extends Activity implements CompoundButton.OnCheckedCh
     private static native void nativeRotationChanged(int rotation);
     private ActivityMainBinding binding;
     private SharedPreferences preferences;
+    private static final int CAMERA_PERMISSION_CODE = 100;
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -46,7 +51,6 @@ public class MainActivity extends Activity implements CompoundButton.OnCheckedCh
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         try {
             GStreamer.init(this);
         } catch (Exception e) {
@@ -61,7 +65,12 @@ public class MainActivity extends Activity implements CompoundButton.OnCheckedCh
         boolean is_checked = preferences.getBoolean("isChecked", false);
 
         binding.toggleButton.setChecked(is_checked);
-        onCheckedChanged(binding.toggleButton, is_checked);
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestCameraPermission();
+        } else {
+            onCheckedChanged(binding.toggleButton, is_checked);
+        }
         binding.toggleButton.setOnCheckedChangeListener(this);
     }
 
@@ -81,6 +90,25 @@ public class MainActivity extends Activity implements CompoundButton.OnCheckedCh
         SharedPreferences.Editor ed = preferences.edit();
         ed.putBoolean("isChecked", binding.toggleButton.isChecked());
         ed.apply();
+    }
+
+    private void requestCameraPermission() {
+        binding.textviewMessage.setText(R.string.camera_needed);
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                binding.textviewMessage.setText("");
+                boolean is_checked = preferences.getBoolean("isChecked", false);
+                onCheckedChanged(binding.toggleButton, is_checked);
+            } else {
+                binding.textviewMessage.setText(R.string.camera_permission_denied);
+            }
+        }
     }
 }
 
