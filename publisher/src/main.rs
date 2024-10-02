@@ -76,7 +76,7 @@ fn main() -> Result<(), Error> {
 
     let pipeline = gstreamer::parse::launch(
         r#"autovideosrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! 
-        tee name=t ! queue leaky=downstream leaky=downstream max-size-buffers=1 ! taginject tags="title=Publisher" ! autovideosink
+        tee name=t ! queue leaky=downstream leaky=downstream max-size-buffers=1 ! taginject tags="title=Publisher" ! videoconvert ! autovideosink
         t. ! queue leaky=downstream leaky=downstream max-size-buffers=1 !
         videoconvert ! openh264enc complexity=low gop-size=25 bitrate=1024000 num-slices=4 ! 
         h264parse ! video/x-h264,alignment=nal,stream-format=byte-stream ! appsink max-buffers=1 name=appsink sync=false"#,
