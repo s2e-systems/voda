@@ -14,6 +14,7 @@ use dust_dds::{
     },
 };
 use gstreamer::{self, prelude::*, DebugCategory, DebugLevel, DebugMessage, Pipeline};
+use gstreamer_video::{VideoOrientationMethod, VideoOverlay};
 use gstreamer_video_sys::GstVideoOverlay;
 use jni::{
     objects::{GlobalRef, JClass, JObject, JValueGen},
@@ -456,7 +457,7 @@ unsafe extern "C" fn gst_android_get_application_class_loader() -> jni::sys::job
 
 unsafe fn set_window_handle_to_overlay_in_pipeline(pipeline: &Pipeline, native_window: usize) {
     let overlay = pipeline
-        .by_interface(gstreamer_video::VideoOverlay::static_type())
+        .by_interface(VideoOverlay::static_type())
         .expect("Pipeline has VideoOverlay");
     gstreamer_video_sys::gst_video_overlay_set_window_handle(
         overlay.as_ptr() as *mut GstVideoOverlay,
@@ -476,10 +477,10 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRotationChanged(
     if let Ok(application) = APPLICATION.lock() {
         if let Some(Application::Publisher(p)) = application.as_ref() {
             let video_direction = match rotation {
-                0 => gstreamer_video::VideoOrientationMethod::_90r,
-                1 => gstreamer_video::VideoOrientationMethod::Identity,
-                3 => gstreamer_video::VideoOrientationMethod::_180,
-                _ => gstreamer_video::VideoOrientationMethod::Identity,
+                0 => VideoOrientationMethod::_90r,
+                1 => VideoOrientationMethod::Identity,
+                3 => VideoOrientationMethod::_180,
+                _ => VideoOrientationMethod::Identity,
             };
 
             match p.pipeline.by_name("video_flip") {

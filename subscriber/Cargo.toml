@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 dust_dds = { version = "0.11" }
-gstreamer = "0.23.0"
-gstreamer-app = "0.23.0"
+gstreamer = "0.23.2"
+gstreamer-app = "0.23.2"

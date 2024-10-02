@@ -1,9 +1,4 @@
 [workspace]
 resolver = "2"
-members = [
-    "subscriber",
-    "publisher",
-    "test",
-    "android/app",
-]
-default-members = ["subscriber", "publisher", "test"]
+members = ["subscriber", "publisher", "android/app"]
+default-members = ["subscriber", "publisher"]
