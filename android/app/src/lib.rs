@@ -250,12 +250,6 @@ impl Subscriber {
                             }
                             self.last_received = sample_data.frame_num;
 
-                            // android_log_write(
-                            //     android_LogPriority::ANDROID_LOG_INFO,
-                            //     "VoDA",
-                            //     &format!("sample received: {:?}", sample_data.frame_num),
-                            // );
-
                             let mut buffer = gstreamer::Buffer::with_size(sample_data.frame.len())
                                 .expect("buffer creation failed");
                             {

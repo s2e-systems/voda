@@ -122,7 +122,7 @@ fn main() -> Result<(), Error> {
     for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
         match msg.view() {
             gstreamer::MessageView::Eos(..) => break,
-            gstreamer::MessageView::Error(err) => Err(err)?,
+            gstreamer::MessageView::Error(err) => println!("{}", err),
             _ => (),
         }
     }
