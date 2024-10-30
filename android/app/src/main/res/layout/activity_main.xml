@@ -1,62 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_marginVertical="30dip"
     android:orientation="vertical">
 
     <SurfaceView
         android:id="@+id/surface_video"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_gravity="center_vertical|center_horizontal" />
+        android:layout_height="0dp"
+        android:layout_gravity="center_vertical|center_horizontal"
+        android:layout_weight="1"
+        android:foreground="@drawable/pub_sub_selector"
+        android:foregroundGravity="center_vertical|center_horizontal"
+        android:foregroundTint="#FFFFFF" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+    <ToggleButton
+        android:id="@+id/toggleButton"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:backgroundTint="#00CCCCCC"
+        android:fontFamily="sans-serif-condensed"
+        android:textAlignment="center"
+        android:textAllCaps="false"
+        android:textColor="@android:color/white"
+        android:textOff="@string/publisher_button"
+        android:textOn="@string/subscriber_button"
+        android:textSize="30sp" />
 
-        <TextView
-            android:id="@+id/textview_message"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dip"
-            android:fontFamily="sans-serif-condensed"
-            android:gravity="center_horizontal"
-            android:shadowColor="#555555"
-            android:shadowRadius="10"
-            android:textColor="#FFFFFF"
-            android:textSize="20dip"
-            android:textStyle="bold"
-            tools:text="VoDA Publisher" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="bottom"
-            android:orientation="vertical">
-
-            <ToggleButton
-                android:id="@+id/toggleButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="30dip"
-                android:backgroundTint="#00CCCCCC"
-                android:drawableRight="@drawable/pub_sub_selector"
-                android:drawableTint="@android:color/white"
-                android:drawableTintMode="src_in"
-                android:fontFamily="sans-serif-condensed"
-                android:maxHeight="70dip"
-                android:minHeight="60dip"
-                android:outlineSpotShadowColor="#00CCCCCC"
-                android:textAlignment="textEnd"
-                android:textAllCaps="false"
-                android:textColor="@android:color/white"
-                android:textOff="⇄ Publisher"
-                android:textOn="⇆ Subscriber"
-                android:textSize="34sp" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-</FrameLayout>
+</LinearLayout>

@@ -65,6 +65,12 @@ impl From<dust_dds::infrastructure::error::DdsError> for VodaError {
     }
 }
 
+impl From<jni::errors::Error> for VodaError {
+    fn from(value: jni::errors::Error) -> Self {
+        VodaError(format!("jniError: {:?}", value))
+    }
+}
+
 #[derive(Debug, dust_dds::topic_definition::type_support::DdsType)]
 struct Video<'a> {
     user_id: i16,
@@ -76,6 +82,7 @@ static mut JAVA_VM: Option<JavaVM> = None;
 static mut CLASS_LOADER: Option<GlobalRef> = None;
 static mut NATIVE_WINDOW: Option<usize> = None;
 
+static MAIN_ACTIVITY: Mutex<Option<GlobalRef>> = Mutex::new(None);
 static APPLICATION: Mutex<Option<Application>> = Mutex::new(None);
 
 /// Convenience function that removes the DDS domain participant from domain 0
@@ -162,6 +169,22 @@ impl Publisher {
                         if let Err(err) = writer.write(&video_sample, None) {
                             VodaError::from(err).android_log_write();
                         };
+                    }
+                    Ok(gstreamer::FlowSuccess::Ok)
+                })
+                .new_preroll(move |_| {
+                    unsafe {
+                        if let Some(java_vm) = JAVA_VM.as_ref() {
+                            let mut env = java_vm.attach_current_thread().unwrap();
+                            if let Err(err) =
+                                env.call_method(MAIN_ACTIVITY.lock().unwrap().as_ref().unwrap().as_obj(), "removeForeground", "()V", &[])
+                            {
+                                if env.exception_check().unwrap() {
+                                    env.exception_describe().ok();
+                                }
+                                VodaError::from(err).android_log_write();
+                            }
+                        }
                     }
                     Ok(gstreamer::FlowSuccess::Ok)
                 })
@@ -489,6 +512,18 @@ unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeRotationChanged(
                 None => VodaError("videoflip not present".to_string()).android_log_write(),
             }
         }
+    }
+}
+
+#[no_mangle]
+unsafe extern "C" fn Java_com_s2e_1systems_MainActivity_nativeSetMainActivity(
+    env: JNIEnv,
+    _: JClass,
+    main_activity: JObject,
+) {
+    let mut main_activity_lock = MAIN_ACTIVITY.lock().unwrap();
+    if main_activity_lock.is_none() {
+        *main_activity_lock = Some(env.new_global_ref(&main_activity).unwrap());
     }
 }
 

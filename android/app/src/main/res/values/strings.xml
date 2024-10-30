@@ -2,4 +2,6 @@
 <resources>
     <string name="camera_needed">Camera needed to stream video over DDS</string>
     <string name="camera_permission_denied">Camera permission denied. Go to permission settings.</string>
+    <string name="publisher_button">⇄ Publisher</string>
+    <string name="subscriber_button">⇄ Subscriber</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.s2e_systems;
 
+import androidx.annotation.Keep;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -10,6 +11,7 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import android.Manifest;
 import android.content.pm.PackageManager;
+import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -38,9 +40,15 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     private static native void nativeRunPublisher();
     private static native void nativeRunSubscriber();
     private static native void nativeRotationChanged(int rotation);
+    private static native void nativeSetMainActivity(MainActivity mainActivity);
     private ActivityMainBinding binding;
     private SharedPreferences preferences;
     private static final int CAMERA_PERMISSION_CODE = 100;
+
+    @Keep
+    public void removeForeground() {
+        runOnUiThread(() -> binding.surfaceVideo.setForeground(null));
+    }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -51,6 +59,8 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        nativeSetMainActivity(this);
+
         try {
             GStreamer.init(this);
         } catch (Exception e) {
@@ -77,8 +87,10 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     @Override
     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
         if (isChecked) {
+            binding.surfaceVideo.setForeground(AppCompatResources.getDrawable(this.getApplicationContext(), R.drawable.subscriber_logo));
             nativeRunSubscriber();
         } else {
+            binding.surfaceVideo.setForeground(AppCompatResources.getDrawable(this.getApplicationContext(), R.drawable.publisher_logo));
             nativeRunPublisher();
         }
         onConfigurationChanged(this.getResources().getConfiguration());
@@ -93,7 +105,6 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     }
 
     private void requestCameraPermission() {
-        binding.textviewMessage.setText(R.string.camera_needed);
         ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
     }
 
@@ -102,11 +113,8 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == CAMERA_PERMISSION_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                binding.textviewMessage.setText("");
                 boolean is_checked = preferences.getBoolean("isChecked", false);
                 onCheckedChanged(binding.toggleButton, is_checked);
-            } else {
-                binding.textviewMessage.setText(R.string.camera_permission_denied);
             }
         }
     }
