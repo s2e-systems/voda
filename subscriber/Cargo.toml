@@ -1,9 +1,9 @@
 [package]
 name = "voda-subscriber"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-dust_dds = { version = "0.10" }
+dust_dds = { git = "https://github.com/s2e-systems/dust-dds" }
 gstreamer = "0.22.6"
 gstreamer-app = "0.22.6"

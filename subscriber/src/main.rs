@@ -1,22 +1,24 @@
 use dust_dds::{
+    dds_async::data_reader::DataReaderAsync,
     domain::domain_participant_factory::DomainParticipantFactory,
     infrastructure::{
         error::DdsError,
         qos::QosKind,
-        status::{StatusKind, NO_STATUS},
-    },
-    subscription::{
-        data_reader_listener::DataReaderListener,
         sample_info::{ANY_INSTANCE_STATE, ANY_SAMPLE_STATE, ANY_VIEW_STATE},
+        status::{NO_STATUS, StatusKind},
+        type_support::DdsType,
     },
+    listener::NO_LISTENER,
+    runtime::DdsRuntime,
+    subscription::data_reader_listener::DataReaderListener,
 };
 use gstreamer::prelude::*;
 
-#[derive(Debug, dust_dds::topic_definition::type_support::DdsType)]
-struct Video<'a> {
+#[derive(Debug, DdsType)]
+struct Video {
     user_id: i16,
     frame_num: i32,
-    frame: &'a [u8],
+    frame: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -51,18 +53,14 @@ struct Listener {
     appsrc: gstreamer_app::AppSrc,
 }
 
-impl<'a> DataReaderListener<'a> for Listener {
-    type Foo = Video<'a>;
-
-    fn on_data_available(
-        &mut self,
-        the_reader: dust_dds::subscription::data_reader::DataReader<Self::Foo>,
-    ) {
-        if let Ok(samples) =
-            the_reader.read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+impl<R: DdsRuntime> DataReaderListener<R, Video> for Listener {
+    async fn on_data_available(&mut self, the_reader: DataReaderAsync<R, Video>) {
+        if let Ok(samples) = the_reader
+            .read(1, ANY_SAMPLE_STATE, ANY_VIEW_STATE, ANY_INSTANCE_STATE)
+            .await
         {
             for sample in samples {
-                if let Ok(sample_data) = sample.data() {
+                if let Some(sample_data) = sample.data {
                     println!("sample received: {:?}", sample_data.frame_num);
 
                     let mut buffer = gstreamer::Buffer::with_size(sample_data.frame.len())
@@ -71,7 +69,7 @@ impl<'a> DataReaderListener<'a> for Listener {
                         let buffer_ref = buffer.get_mut().expect("mutable buffer");
                         let mut buffer_samples =
                             buffer_ref.map_writable().expect("writeable buffer");
-                        buffer_samples.clone_from_slice(sample_data.frame);
+                        buffer_samples.clone_from_slice(&sample_data.frame);
                     }
                     self.appsrc
                         .push_buffer(buffer)
@@ -90,16 +88,20 @@ fn main() -> Result<(), Error> {
 
     let domain_id = 0;
     let participant_factory = DomainParticipantFactory::get_instance();
-    let participant =
-        participant_factory.create_participant(domain_id, QosKind::Default, None, NO_STATUS)?;
+    let participant = participant_factory.create_participant(
+        domain_id,
+        QosKind::Default,
+        NO_LISTENER,
+        NO_STATUS,
+    )?;
     let topic = participant.create_topic::<Video>(
         "VideoStream",
         "Video",
         QosKind::Default,
-        None,
+        NO_LISTENER,
         NO_STATUS,
     )?;
-    let subscriber = participant.create_subscriber(QosKind::Default, None, NO_STATUS)?;
+    let subscriber = participant.create_subscriber(QosKind::Default, NO_LISTENER, NO_STATUS)?;
 
     let pipeline = gstreamer::parse::launch(
         r#"appsrc name=appsrc ! openh264dec ! videoconvert ! taginject tags="title=Subscriber" ! autovideosink"#,
@@ -107,9 +109,13 @@ fn main() -> Result<(), Error> {
 
     pipeline.set_state(gstreamer::State::Playing)?;
 
-    let bin = pipeline.downcast_ref::<gstreamer::Bin>().expect("Pipeline is bin");
+    let bin = pipeline
+        .downcast_ref::<gstreamer::Bin>()
+        .expect("Pipeline is bin");
     let appsrc_element = bin.by_name("appsrc").expect("Pipeline has appsrc");
-    let appsrc = appsrc_element.downcast::<gstreamer_app::AppSrc>().expect("is AppSrc type");
+    let appsrc = appsrc_element
+        .downcast::<gstreamer_app::AppSrc>()
+        .expect("is AppSrc type");
     let src_caps = gstreamer::Caps::builder("video/x-h264")
         .field("stream-format", "byte-stream")
         .field("alignment", "au")
@@ -120,7 +126,7 @@ fn main() -> Result<(), Error> {
     let _reader = subscriber.create_datareader(
         &topic,
         QosKind::Default,
-        Some(Box::new(Listener { appsrc })),
+        Some(Listener { appsrc }),
         &[StatusKind::DataAvailable],
     )?;
 

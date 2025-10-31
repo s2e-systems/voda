@@ -1,14 +1,15 @@
 use dust_dds::{
     domain::domain_participant_factory::DomainParticipantFactory,
-    infrastructure::{error::DdsError, qos::QosKind, status::NO_STATUS},
+    infrastructure::{error::DdsError, qos::QosKind, status::NO_STATUS, type_support::DdsType},
+    listener::NO_LISTENER
 };
 use gstreamer::prelude::*;
 
-#[derive(Debug, dust_dds::topic_definition::type_support::DdsType)]
-struct Video<'a> {
+#[derive(Debug, DdsType)]
+struct Video {
     user_id: i16,
     frame_num: i32,
-    frame: &'a [u8],
+    frame: Vec<u8>,
 }
 #[derive(Debug)]
 struct Error(String);
@@ -44,16 +45,16 @@ fn main() -> Result<(), Error> {
     let domain_id = 0;
     let participant_factory = DomainParticipantFactory::get_instance();
     let participant =
-        participant_factory.create_participant(domain_id, QosKind::Default, None, NO_STATUS)?;
+        participant_factory.create_participant(domain_id, QosKind::Default, NO_LISTENER, NO_STATUS)?;
     let topic = participant.create_topic::<Video>(
         "VideoStream",
         "Video",
         QosKind::Default,
-        None,
+        NO_LISTENER,
         NO_STATUS,
     )?;
-    let publisher = participant.create_publisher(QosKind::Default, None, NO_STATUS)?;
-    let writer = publisher.create_datawriter(&topic, QosKind::Default, None, NO_STATUS)?;
+    let publisher = participant.create_publisher(QosKind::Default, NO_LISTENER, NO_STATUS)?;
+    let writer = publisher.create_datawriter(&topic, QosKind::Default, NO_LISTENER, NO_STATUS)?;
 
     let pipeline = gstreamer::parse::launch(
         r#"autovideosrc ! video/x-raw,framerate=[1/1,25/1],width=[1,1280],height=[1,720] ! tee name=t ! queue leaky=2 ! videoconvert ! openh264enc complexity=0 scene-change-detection=0 background-detection=0 bitrate=512000 ! appsink max-buffers=1 name=appsink sync=false t. ! queue leaky=2 ! taginject tags="title=Publisher" ! autovideosink"#,
@@ -78,15 +79,15 @@ fn main() -> Result<(), Error> {
                         .buffer()
                         .expect("buffer exists")
                         .map_readable()
-                        .expect("readable buffer");
+                        .expect("readable buffer").to_vec();
 
                     let video_sample = Video {
                         user_id: 8,
                         frame_num: i,
-                        frame: bytes.as_slice(),
+                        frame: bytes,
                     };
                     writer
-                        .write(&video_sample, None)
+                        .write(video_sample, None)
                         .expect("Sample could not be written");
 
                     i += 1;
